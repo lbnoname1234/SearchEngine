@@ -2,6 +2,7 @@
 #include <vector>
 #include <string>
 #include <cmath>
+#include <fstream>
 #include "SearchEngine.h"
 #include "Tokenizer.h"
 #include "AVLTree.h"
@@ -153,7 +154,8 @@ void testSearchEngineCounters() {
 }
 
 // ===== Test: tinh chat AVL duoc cap nhat dung sau moi lan addDocument(),
-//             kem theo kiem tra search() dung sau khi build xong toan bo index =====
+//             kem theo kiem tra search() dung, dem so lan goi va so buoc duyet cay
+//             cho moi tu rieng le =====
 void testSearchEngineAVLUpdates() {
     std::cout << "\n=== Testing SearchEngine (AVL update properties) ===\n";
 
@@ -203,10 +205,7 @@ void testSearchEngineAVLUpdates() {
     // Tong so tu duy nhat: apple, banana, cherry, date, elderberry, fig, grape = 7 tu
     checkEqual(engine.getIndexSize(), 7, "tong so tu duy nhat trong index == 7");
 
-    // --- Dem so lan goi search() truoc khi bat dau goi trong test nay ---
-    int callsBefore = SearchEngine::getSearchCount();
-
-    // --- Search tung tu, reset bo dem truoc moi lan, in so lan goi cho tu do ---
+    // --- Search tung tu, reset bo dem truoc moi lan, in so lan goi va so buoc cho tu do ---
     std::cout << "\n  Kiem tra search() cho tat ca 7 tu trong index:\n";
 
     struct ExpectedResult {
@@ -263,6 +262,65 @@ void testSearchEngineAVLUpdates() {
     checkEqual(callsForMissing, 1, "search('kiwi') chi goi search() dung 1 lan");
 }
 
+// ===== Helper: nap document tu file txt, moi dong la 1 document =====
+int loadDocumentsFromFile(SearchEngine& engine, const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        std::cerr << "  [LOI] Khong the mo file: " << filepath << "\n";
+        return -1;
+    }
+
+    std::string line;
+    int count = 0;
+    while (std::getline(file, line)) {
+        if (line.empty()) continue;   // bo qua dong rong
+        engine.addDocument(line);
+        count++;
+    }
+
+    file.close();
+    return count;
+}
+
+// ===== Test: nap document tu file data/document.txt va kiem tra search =====
+void testLoadDocumentsFromFile() {
+    std::cout << "\n=== Testing SearchEngine (load tu document.txt) ===\n";
+
+    SearchEngine engine;
+    int loadedCount = loadDocumentsFromFile(engine, "data/document.txt");
+
+    check(loadedCount > 0, "doc duoc it nhat 1 document tu file");
+    std::cout << "  Da nap " << loadedCount << " document tu file.\n";
+
+    std::cout << "\n  Cay AVL index sau khi nap file:\n";
+    std::cout << "    size   = " << engine.getIndexSize() << "\n";
+    std::cout << "    height = " << engine.getIndexHeight() << "\n";
+
+    // Kiem tra mot vai tu chac chan co trong file mau (xem document.txt)
+    std::vector<int> resultApple = engine.search("apple");
+    check(!resultApple.empty(), "search('apple') tim thay it nhat 1 document");
+
+    std::vector<int> resultBanana = engine.search("banana");
+    check(!resultBanana.empty(), "search('banana') tim thay it nhat 1 document");
+
+    std::vector<int> resultMissing = engine.search("zzzznotexist");
+    check(resultMissing.empty(), "search('zzzznotexist') tra ve rong vi tu khong ton tai");
+
+    std::cout << "\n  search('apple')  -> [";
+    for (size_t i = 0; i < resultApple.size(); ++i) {
+        std::cout << resultApple[i];
+        if (i + 1 < resultApple.size()) std::cout << ", ";
+    }
+    std::cout << "]\n";
+
+    std::cout << "  search('banana') -> [";
+    for (size_t i = 0; i < resultBanana.size(); ++i) {
+        std::cout << resultBanana[i];
+        if (i + 1 < resultBanana.size()) std::cout << ", ";
+    }
+    std::cout << "]\n";
+}
+
 // ===== Test AVLTree =====
 void testAVLTreeOperations() {
     std::cout << "\n=== Testing AVLTree ===\n";
@@ -313,6 +371,7 @@ int main() {
     testSearchEngineAddAndSearch();
     testSearchEngineCounters();
     testSearchEngineAVLUpdates();
+    testLoadDocumentsFromFile();
     testAVLTreeOperations();
 
     std::cout << "\n========================================\n";
