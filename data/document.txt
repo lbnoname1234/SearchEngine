@@ -1,0 +1,15 @@
+﻿apple banana cherry
+banana orange apple
+orange grape fig
+fig date elderberry
+date apple cherry banana
+the quick brown fox jumps over the lazy dog
+a journey of a thousand miles begins with a single step
+search engines use inverted index to find documents quickly
+binary search trees keep data sorted for fast lookup
+avl trees automatically balance themselves after insertion and deletion
+the rain in spain falls mainly on the plain
+practice makes perfect when learning data structures and algorithms
+hello world this is a simple test document
+banana smoothie with apple and a hint of orange juice
+elderberry jam pairs well with fresh baked bread
