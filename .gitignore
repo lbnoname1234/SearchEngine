@@ -3,3 +3,5 @@
 __pycache__/
 *.pyc
 
+
+web/data/uploads/example.txt
