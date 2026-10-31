@@ -3,7 +3,7 @@ const API = {
   and: q => `/api/search/and?q=${encodeURIComponent(q)}`,
   or: q => `/api/search/or?q=${encodeURIComponent(q)}`,
   suggest: q => `/api/suggest?q=${encodeURIComponent(q)}`,
-  benchmark: `/api/benchmark`,
+  benchmark: q => q ? `/api/benchmark?q=${encodeURIComponent(q)}` : `/api/benchmark`,
 };
  
 async function safeJson(res) {
@@ -141,6 +141,7 @@ async function runSearch() {
     `;
  
     renderResults(docIds, ranked, q);
+    updateBenchmark(q);
  
     if (docIds.length === 0) {
       const sres = await fetch(API.suggest(q.split(',')[0]));
@@ -328,6 +329,7 @@ async function addDocument() {
     if (data.files) renderFileList(data.files);
     updateIndexMeta(data.stats);
     pulseTree();
+    updateBenchmark();
   } catch (err) {
     statRow.innerHTML = `<span style="color: var(--danger)">Lỗi: ${err.message}</span>`;
   } finally {
@@ -345,47 +347,30 @@ searchInput.addEventListener('keydown', e => { if (e.key === 'Enter') handleSubm
  
 // ===== Upload file =====
 const fileInput = document.getElementById('fileInput');
-const replaceModeCheckbox = document.getElementById('replaceMode');
- 
+
 fileInput.addEventListener('change', async () => {
   const file = fileInput.files[0];
   if (!file) return;
- 
-  const isReplace = replaceModeCheckbox.checked;
- 
-  // Xác nhận lại nếu chọn Replace — vì thao tác này xóa hết dữ liệu cũ, không hoàn tác được
-  if (isReplace) {
-    const ok = confirm(
-      `Toàn bộ document hiện có sẽ bị XÓA và thay bằng nội dung file "${file.name}".\n` +
-      `Thao tác này không thể hoàn tác. Tiếp tục?`
-    );
-    if (!ok) {
-      fileInput.value = '';
-      return;
-    }
-  }
- 
+
   uploadStatus.textContent = 'Đang tải lên…';
   uploadStatus.classList.remove('error');
- 
+
   const formData = new FormData();
   formData.append('file', file);
-  formData.append('mode', isReplace ? 'replace' : 'append');
- 
+  formData.append('mode', 'append');
+
   try {
     const res = await fetch('/api/documents/upload', { method: 'POST', body: formData });
     const data = await safeJson(res);
     if (data.error) throw new Error(data.error);
- 
-    // Cập nhật tên file nguồn để hiển thị đúng trong kết quả search sau này
+
     currentCorpusFile = file.name;
- 
-    uploadStatus.textContent = isReplace
-      ? `Đã thay thế toàn bộ bằng ${data.added} document từ "${file.name}" ✓`
-      : `Đã thêm ${data.added} document từ "${file.name}" ✓`;
+
+    uploadStatus.textContent = `Đã thêm ${data.added} document từ "${file.name}" ✓`;
     if (data.files) renderFileList(data.files);
     updateIndexMeta(data.stats);
     pulseTree();
+    updateBenchmark();
   } catch (err) {
     uploadStatus.textContent = `Lỗi: ${err.message}`;
     uploadStatus.classList.add('error');
@@ -466,6 +451,7 @@ function renderFileList(files) {
         renderFileList(data.files);
         updateIndexMeta(data.stats);
         pulseTree();
+        updateBenchmark();
         uploadStatus.textContent = `Removed file "${fname}" ✓`;
         uploadStatus.classList.remove('error');
 
@@ -498,6 +484,7 @@ if (clearAllFilesBtn) {
       renderFileList([]);
       updateIndexMeta(data.stats);
       pulseTree();
+      updateBenchmark();
       uploadStatus.textContent = 'Cleared all files from index ✓';
       uploadStatus.classList.remove('error');
       resultList.innerHTML = '';
@@ -530,20 +517,51 @@ async function loadStats() {
 }
 loadStats();
  
-// ===== Benchmark (load once on page load) =====
-async function loadBenchmark() {
+// ===== Dynamic Benchmark (cập nhật theo từng từ khóa tìm kiếm) =====
+async function updateBenchmark(keyword = '') {
   const grid = document.getElementById('benchGrid');
   const meta = document.getElementById('indexMeta');
+  const titleEl = document.querySelector('.bench-title');
+  if (!grid) return;
+
   try {
-    const res = await fetch(API.benchmark);
+    const url = API.benchmark(keyword);
+    const res = await fetch(url);
     const data = await safeJson(res);
     if (data.error) throw new Error(data.error);
- 
+
+    const isCustom = Boolean(keyword && keyword.trim());
+    const words = isCustom ? keyword.split(/[\s,]+/).filter(Boolean) : [];
+
+    if (titleEl) {
+      titleEl.textContent = isCustom
+        ? `AVL vs std::map vs unordered_map (Benchmark cho: "${words.join(', ')}")`
+        : `AVL vs std::map vs unordered_map (Baseline mặc định)`;
+    }
+
+    const avgStepsFormatted = Number(data.avl.avgSteps).toFixed(1);
+    let stepsLabel = '';
+
+    if (!isCustom) {
+      stepsLabel = `avg ${avgStepsFormatted} steps`;
+    } else if (words.length > 1) {
+      stepsLabel = `avg ${avgStepsFormatted} steps (${words.length} lượt từ tìm kiếm)`;
+    } else {
+      const rep = data.repeatCount || 0;
+      if (rep > 1) {
+        stepsLabel = `avg ${avgStepsFormatted} steps (lặp lại ${rep} lần trong bài)`;
+      } else if (rep === 1) {
+        stepsLabel = `avg ${avgStepsFormatted} steps (xuất hiện 1 lần)`;
+      } else {
+        stepsLabel = `avg ${avgStepsFormatted} steps (không có trong bài)`;
+      }
+    }
+
     grid.innerHTML = `
       <div class="bench-card is-avl">
         <div class="bench-name">AVL Tree (custom)</div>
         <div class="bench-value">${data.avl.timeMs.toFixed(3)}<small> ms</small></div>
-        <div class="bench-note">height ${data.avl.height} · avg ${data.avl.avgSteps.toFixed(1)} steps</div>
+        <div class="bench-note">height ${data.avl.height} · ${stepsLabel}</div>
       </div>
       <div class="bench-card">
         <div class="bench-name">std::map (Red-Black)</div>
@@ -556,10 +574,13 @@ async function loadBenchmark() {
         <div class="bench-note">O(1) average, no ordering</div>
       </div>
     `;
-    meta.textContent = `index size ${data.indexSize} · height ${data.actualHeight} (theory ≈ ${data.theoreticalHeight.toFixed(2)})`;
+
+    if (meta) {
+      meta.textContent = `index size ${data.indexSize} · height ${data.actualHeight} (theory ≈ ${data.theoreticalHeight.toFixed(2)})`;
+    }
   } catch (err) {
     grid.innerHTML = `<div class="bench-card"><div class="bench-name" style="color:var(--danger)">Không tải được benchmark: ${err.message}</div></div>`;
   }
 }
-loadBenchmark();
+updateBenchmark();
 emptyState.classList.add('show');

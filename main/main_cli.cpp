@@ -160,7 +160,7 @@ void printJsonStringArray(const std::vector<std::string> &items)
     std::cout << "]";
 }
 
-void printJsonBenchmark(const BenchmarkResult &r)
+void printJsonBenchmark(const BenchmarkResult &r, int repeatCount = 0)
 {
     std::cout << "{"
               << "\"avl\":{\"name\":\"" << r.avl.name << "\",\"timeMs\":" << r.avl.searchTimeMs
@@ -169,26 +169,31 @@ void printJsonBenchmark(const BenchmarkResult &r)
               << "\"unorderedMap\":{\"name\":\"" << r.unorderedMap.name << "\",\"timeMs\":" << r.unorderedMap.searchTimeMs << "},"
               << "\"indexSize\":" << r.indexSize
               << ",\"actualHeight\":" << r.actualHeight
-              << ",\"theoreticalHeight\":" << r.theoreticalHeight
-              << "}";
+              << ",\"theoreticalHeight\":" << r.theoreticalHeight;
+    if (repeatCount > 0)
+    {
+        std::cout << ",\"repeatCount\":" << repeatCount;
+    }
+    std::cout << "}";
 }
 
-// split string by comma, auto eliminate spaces at start/ end of words
+// Tách danh sách từ khóa theo dấu phẩy hoặc khoảng trắng (hỗ trợ cả từ lặp lại)
 std::vector<std::string> splitByComma(const std::string &s)
 {
     std::vector<std::string> result;
-    std::stringstream ss(s);
-    std::string token;
-    while (std::getline(ss, token, ','))
+    std::string clean = s;
+    for (char &c : clean)
     {
-        size_t start = token.find_first_not_of(" \t");
-        size_t end = token.find_last_not_of(" \t");
-
-        if (start == std::string::npos) // token toan khoang trang hoac rong
-            continue;
-        std::string after_token = token.substr(start, end - start + 1);
-        if (!token.empty())
-            result.push_back(after_token);
+        if (c == ',')
+            c = ' ';
+    }
+    std::stringstream ss(clean);
+    std::string token;
+    while (ss >> token)
+    {
+        for (char &c : token)
+            c = (char)tolower((unsigned char)c);
+        result.push_back(token);
     }
     return result;
 }
@@ -240,10 +245,21 @@ int main(int argc, char *argv[])
         std::vector<std::string> testWords = {"the", "a", "is", "of", "to"};
         // Nếu muốn benchmark theo từ thật trong corpus thay vì từ cố định,
         // có thể truyền keyword dạng "word1,word2,word3" và splitByComma như trên
+        int repeatCount = 0;
         if (!keyword.empty())
+        {
             testWords = splitByComma(keyword);
+            if (testWords.size() == 1)
+            {
+                repeatCount = engine.getFrequency(testWords[0]);
+            }
+            else
+            {
+                repeatCount = (int)testWords.size();
+            }
+        }
         BenchmarkResult result = runBenchmark(engine, testWords);
-        printJsonBenchmark(result);
+        printJsonBenchmark(result, repeatCount);
     }
     else if (mode == "stats")
     {

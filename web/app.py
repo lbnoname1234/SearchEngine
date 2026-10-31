@@ -4,6 +4,8 @@ import os
 from flask import Flask, jsonify, request, render_template
 
 app = Flask(__name__)
+app.config["TEMPLATES_AUTO_RELOAD"] = True
+app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 
 # Đường dẫn tới binary đã build từ main_cli.cpp
 # Tự động chọn search_cli.exe (Windows) hoặc search_cli (Linux/Render)
