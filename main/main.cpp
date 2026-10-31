@@ -3,73 +3,93 @@
 #include <string>
 #include <cmath>
 #include <fstream>
+#include <iomanip>
+#include <map>
+#include <algorithm>
 #include "SearchEngine.h"
 #include "Tokenizer.h"
 #include "AVLTree.h"
+#include "benchmark.h"
 
-// ===== Helper kiểm tra & in kết quả =====
+// Helper check and print result
 static int g_totalChecks = 0;
 static int g_failedChecks = 0;
 
-void check(bool condition, const std::string& description) {
+void check(bool condition, const std::string &description)
+{
     g_totalChecks++;
-    if (condition) {
+    if (condition)
+    {
         std::cout << "  [PASS] " << description << "\n";
-    } else {
+    }
+    else
+    {
         g_failedChecks++;
         std::cout << "  [FAIL] " << description << "\n";
     }
 }
 
 template <typename T>
-void checkEqual(const T& actual, const T& expected, const std::string& description) {
+void checkEqual(const T &actual, const T &expected, const std::string &description)
+{
     g_totalChecks++;
-    if (actual == expected) {
+    if (actual == expected)
+    {
         std::cout << "  [PASS] " << description << "\n";
-    } else {
+    }
+    else
+    {
         g_failedChecks++;
         std::cout << "  [FAIL] " << description
-                   << " (expected: " << expected << ", got: " << actual << ")\n";
+                  << " (expected: " << expected << ", got: " << actual << ")\n";
     }
 }
 
-// Overload chuyen biet cho vector<int> (vector khong co operator<< nen
-// khong the dung ban template chung o tren)
-void checkEqual(const std::vector<int>& actual, const std::vector<int>& expected,
-                 const std::string& description) {
+void checkEqual(const std::vector<int> &actual, const std::vector<int> &expected,
+                const std::string &description)
+{
     g_totalChecks++;
-    if (actual == expected) {
+    if (actual == expected)
+    {
         std::cout << "  [PASS] " << description << "\n";
-    } else {
+    }
+    else
+    {
         g_failedChecks++;
-        auto toStr = [](const std::vector<int>& v) {
+        auto toStr = [](const std::vector<int> &v)
+        {
             std::string s = "[";
-            for (size_t i = 0; i < v.size(); ++i) {
+            for (size_t i = 0; i < v.size(); ++i)
+            {
                 s += std::to_string(v[i]);
-                if (i + 1 < v.size()) s += ", ";
+                if (i + 1 < v.size())
+                    s += ", ";
             }
             s += "]";
             return s;
         };
         std::cout << "  [FAIL] " << description
-                   << " (expected: " << toStr(expected) << ", got: " << toStr(actual) << ")\n";
+                  << " (expected: " << toStr(expected) << ", got: " << toStr(actual) << ")\n";
     }
 }
 
-// ===== Test Tokenizer =====
-void testTokenizer() {
+// Test Tokenizer
+void testTokenizer()
+{
     std::cout << "\n=== Testing Tokenizer ===\n";
 
     std::vector<std::string> result = Tokenizer::tokenize("Hello world");
     checkEqual<size_t>(result.size(), 2, "tokenize('Hello world') size == 2");
-    if (result.size() >= 2) {
-        checkEqual(result[0], std::string("Hello"), "result[0] == 'Hello'");
+    if (result.size() >= 2)
+    {
+        checkEqual(result[0], std::string("hello"), "result[0] == 'hello'");
         checkEqual(result[1], std::string("world"), "result[1] == 'world'");
     }
 
     result = Tokenizer::tokenize("  spaced   out \t words\n");
     checkEqual<size_t>(result.size(), 3, "tokenize with extra whitespace size == 3");
-    if (result.size() >= 3) {
+    if (result.size() >= 3)
+    {
         checkEqual(result[0], std::string("spaced"), "result[0] == 'spaced'");
         checkEqual(result[1], std::string("out"), "result[1] == 'out'");
         checkEqual(result[2], std::string("words"), "result[2] == 'words'");
@@ -80,13 +100,15 @@ void testTokenizer() {
 
     result = Tokenizer::tokenize("single");
     checkEqual<size_t>(result.size(), 1, "tokenize('single') size == 1");
-    if (!result.empty()) {
+    if (!result.empty())
+    {
         checkEqual(result[0], std::string("single"), "result[0] == 'single'");
     }
 }
 
-// ===== Test SearchEngine: add/search co ban =====
-void testSearchEngineAddAndSearch() {
+// Test SearchEngine: simple add & search
+void testSearchEngineAddAndSearch()
+{
     std::cout << "\n=== Testing SearchEngine (add/search) ===\n";
 
     SearchEngine engine;
@@ -96,14 +118,16 @@ void testSearchEngineAddAndSearch() {
 
     std::vector<int> found = engine.search("one");
     checkEqual<size_t>(found.size(), 2, "search('one') returns 2 results");
-    if (found.size() >= 2) {
+    if (found.size() >= 2)
+    {
         checkEqual(found[0], 0, "found[0] == 0");
         checkEqual(found[1], 2, "found[1] == 2");
     }
 
     found = engine.search("two");
     checkEqual<size_t>(found.size(), 1, "search('two') returns 1 result");
-    if (!found.empty()) {
+    if (!found.empty())
+    {
         checkEqual(found[0], 1, "found[0] == 1");
     }
 
@@ -111,18 +135,18 @@ void testSearchEngineAddAndSearch() {
     check(found.empty(), "search('missing') returns empty");
 }
 
-// ===== Test SearchEngine: dem so lan search() va term frequency =====
-void testSearchEngineCounters() {
+// Test SearchEngine: đếm số lần search() và term frequency
+void testSearchEngineCounters()
+{
     std::cout << "\n=== Testing SearchEngine (counters) ===\n";
 
     int callsBefore = SearchEngine::getSearchCount();
 
     SearchEngine engine;
-    engine.addDocument("apple banana apple");   // doc 0: apple x2, banana x1
-    engine.addDocument("banana orange apple");  // doc 1: banana x1, orange x1, apple x1
-    engine.addDocument("orange orange");        // doc 2: orange x2
+    engine.addDocument("apple banana apple");
+    engine.addDocument("banana orange apple");
+    engine.addDocument("orange orange");
 
-    // --- Term frequency: tong so lan xuat hien tren toan bo documents ---
     int freqApple = engine.getFrequency("apple");
     int freqBanana = engine.getFrequency("banana");
     int freqOrange = engine.getFrequency("orange");
@@ -131,14 +155,13 @@ void testSearchEngineCounters() {
     checkEqual(freqApple, 3, "term frequency 'apple' == 3 (2+1)");
     checkEqual(freqBanana, 2, "term frequency 'banana' == 2 (1+1)");
     checkEqual(freqOrange, 3, "term frequency 'orange' == 3 (1+2)");
-    checkEqual(freqMissing, 0, "term frequency 'grape' == 0 (khong ton tai)");
+    checkEqual(freqMissing, 0, "term frequency 'grape' == 0 (does not exist)");
 
     std::cout << "\n  Term frequency:\n";
     std::cout << "    apple  : " << freqApple << "\n";
     std::cout << "    banana : " << freqBanana << "\n";
     std::cout << "    orange : " << freqOrange << "\n";
 
-    // --- Dem so lan goi search() ---
     engine.search("apple");
     engine.search("banana");
     engine.search("orange");
@@ -147,83 +170,77 @@ void testSearchEngineCounters() {
     int callsAfter = SearchEngine::getSearchCount();
     int callsThisTest = callsAfter - callsBefore;
 
-    checkEqual(callsThisTest, 4, "search() duoc goi dung 4 lan trong test nay");
+    checkEqual(callsThisTest, 4, "search() is called exactly 4 times in this test");
 
-    std::cout << "\n  Tong so lan search() da goi (toan chuong trinh): "
-               << SearchEngine::getSearchCount() << "\n";
+    std::cout << "\n  Total number of search() calls (entire program): "
+              << SearchEngine::getSearchCount() << "\n";
 }
 
-// ===== Test: tinh chat AVL duoc cap nhat dung sau moi lan addDocument(),
-//             kem theo kiem tra search() dung, dem so lan goi va so buoc duyet cay
-//             cho moi tu rieng le =====
-void testSearchEngineAVLUpdates() {
+//  Test: tính chất AVL được cập nhật đúng sau mỗi lần addDocument()
+void testSearchEngineAVLUpdates()
+{
     std::cout << "\n=== Testing SearchEngine (AVL update properties) ===\n";
 
     SearchEngine engine;
 
     int prevSize = engine.getIndexSize();
-    checkEqual(prevSize, 0, "index size == 0 truoc khi them document nao");
+    checkEqual(prevSize, 0, "index size == 0 before adding document");
 
-    // Moi document them vao co the lam tang size cua cay (cac tu moi)
-    // nhung KHONG bao gio lam giam size, va height luon hop ly (can bang AVL)
     std::vector<std::string> documents = {
-        "apple banana",          // doc 0: apple, banana
-        "banana cherry",         // doc 1: banana, cherry
-        "apple cherry date",     // doc 2: apple, cherry, date
-        "date elderberry fig",   // doc 3: date, elderberry, fig
-        "fig grape"               // doc 4: fig, grape
-    };
+        "apple banana",
+        "banana cherry",
+        "apple cherry date",
+        "date elderberry fig",
+        "fig grape"};
 
-    for (size_t i = 0; i < documents.size(); ++i) {
+    for (size_t i = 0; i < documents.size(); ++i)
+    {
         engine.addDocument(documents[i]);
 
         int newSize = engine.getIndexSize();
         int newHeight = engine.getIndexHeight();
 
-        std::cout << "\n  Sau addDocument(\"" << documents[i] << "\"):\n";
+        std::cout << "\n  after addDocument(\"" << documents[i] << "\"):\n";
         std::cout << "    index size   = " << newSize << "\n";
         std::cout << "    index height = " << newHeight << "\n";
 
-        // Tinh chat 1: size khong bao gio giam khi them document
-        check(newSize >= prevSize, "index size khong giam sau khi them document");
+        check(newSize >= prevSize, "index size is not decreased after adding document");
 
-        // Tinh chat 2: AVL phai can bang -> height <= 1.45 * log2(size + 2) (xap xi ly thuyet AVL)
-        // Quy uoc cua project: cay rong height = 0, cay 1 node height = 1
-        if (newSize > 0) {
+        if (newSize > 0)
+        {
             double maxAllowedHeight = 1.45 * std::log2(newSize + 2.0) + 1;
             check(newHeight <= maxAllowedHeight + 1,
-                  "height nam trong gioi han ly thuyet cua AVL (can bang)");
+                  "Height is in AVL limit (balanced)");
         }
 
         prevSize = newSize;
     }
 
-    std::cout << "\n  Cay AVL cuoi cung sau tat ca document:\n";
+    std::cout << "\n  final AVL Tree after all document:\n";
     engine.printIndexTree();
     std::cout << "\n";
 
-    // Tong so tu duy nhat: apple, banana, cherry, date, elderberry, fig, grape = 7 tu
-    checkEqual(engine.getIndexSize(), 7, "tong so tu duy nhat trong index == 7");
+    checkEqual(engine.getIndexSize(), 7, "total number of words index == 7");
 
-    // --- Search tung tu, reset bo dem truoc moi lan, in so lan goi va so buoc cho tu do ---
-    std::cout << "\n  Kiem tra search() cho tat ca 7 tu trong index:\n";
+    std::cout << "\n check search() for all 7 words in index:\n";
 
-    struct ExpectedResult {
+    struct ExpectedResult
+    {
         std::string word;
         std::vector<int> expectedDocs;
     };
 
     std::vector<ExpectedResult> expectations = {
-        {"apple",      {0, 2}},
-        {"banana",     {0, 1}},
-        {"cherry",     {1, 2}},
-        {"date",       {2, 3}},
+        {"apple", {0, 2}},
+        {"banana", {0, 1}},
+        {"cherry", {1, 2}},
+        {"date", {2, 3}},
         {"elderberry", {3}},
-        {"fig",        {3, 4}},
-        {"grape",      {4}}
-    };
+        {"fig", {3, 4}},
+        {"grape", {4}}};
 
-    for (const ExpectedResult& exp : expectations) {
+    for (const ExpectedResult &exp : expectations)
+    {
         SearchEngine::resetSearchCount();
 
         std::vector<int> result = engine.search(exp.word);
@@ -232,22 +249,23 @@ void testSearchEngineAVLUpdates() {
         int stepsForThisWord = engine.getLastSearchSteps();
 
         std::cout << "    search('" << exp.word << "') -> [";
-        for (size_t i = 0; i < result.size(); ++i) {
+        for (size_t i = 0; i < result.size(); ++i)
+        {
             std::cout << result[i];
-            if (i + 1 < result.size()) std::cout << ", ";
+            if (i + 1 < result.size())
+                std::cout << ", ";
         }
-        std::cout << "]  (so lan goi: " << callsForThisWord
-                   << ", so buoc duyet cay: " << stepsForThisWord << ")\n";
+        std::cout << "]  (number of calls: " << callsForThisWord
+                  << ", steps of tree traversal: " << stepsForThisWord << ")\n";
 
         checkEqual(result, exp.expectedDocs,
-                   "search('" + exp.word + "') tra ve dung danh sach document ID");
+                   "search('" + exp.word + "') returns true document ID list");
         checkEqual(callsForThisWord, 1,
-                   "search('" + exp.word + "') chi goi search() dung 1 lan");
+                   "search('" + exp.word + "') only called search() once");
 
-        // So buoc duyet cay phai <= height cua cay (khong the di sau hon chieu cao cay)
         int treeHeight = engine.getIndexHeight();
         check(stepsForThisWord >= 1 && stepsForThisWord <= treeHeight,
-              "so buoc duyet cay nam trong khoang hop ly (1 <= steps <= height)");
+              "Number of calls is appropriate (1 <= steps <= height)");
     }
 
     SearchEngine::resetSearchCount();
@@ -255,25 +273,29 @@ void testSearchEngineAVLUpdates() {
     int callsForMissing = SearchEngine::getSearchCount();
     int stepsForMissing = engine.getLastSearchSteps();
 
-    std::cout << "    search('kiwi') -> []  (so lan goi: " << callsForMissing
-               << ", so buoc duyet cay: " << stepsForMissing << ")\n";
+    std::cout << "    search('kiwi') -> []  (number of calls: " << callsForMissing
+              << ", Steps of tree traversal: " << stepsForMissing << ")\n";
 
-    check(missing.empty(), "search('kiwi') tra ve rong vi tu khong ton tai");
-    checkEqual(callsForMissing, 1, "search('kiwi') chi goi search() dung 1 lan");
+    check(missing.empty(), "search('kiwi') returns empty because it does not exist");
+    checkEqual(callsForMissing, 1, "search('kiwi') only called Search for once");
 }
 
-// ===== Helper: nap document tu file txt, moi dong la 1 document =====
-int loadDocumentsFromFile(SearchEngine& engine, const std::string& filepath) {
+// Helper: nạp document từ file txt, mỗi dòng là 1 document
+int loadDocumentsFromFile(SearchEngine &engine, const std::string &filepath)
+{
     std::ifstream file(filepath);
-    if (!file.is_open()) {
-        std::cerr << "  [LOI] Khong the mo file: " << filepath << "\n";
+    if (!file.is_open())
+    {
+        std::cerr << "  [ERROR] Can't open file: " << filepath << "\n";
         return -1;
     }
 
     std::string line;
     int count = 0;
-    while (std::getline(file, line)) {
-        if (line.empty()) continue;   // bo qua dong rong
+    while (std::getline(file, line))
+    {
+        if (line.empty())
+            continue;
         engine.addDocument(line);
         count++;
     }
@@ -282,47 +304,90 @@ int loadDocumentsFromFile(SearchEngine& engine, const std::string& filepath) {
     return count;
 }
 
-// ===== Test: nap document tu file data/document.txt va kiem tra search =====
-void testLoadDocumentsFromFile() {
-    std::cout << "\n=== Testing SearchEngine (load tu document.txt) ===\n";
+// Helper: trích ra N từ xuất hiện nhiều nhất trong file, để test/demo luôn dùng từ khóa CÓ THẬT trong document.txt, không phụ thuộc nội dung cụ thể
+std::vector<std::string> extractTopWords(const std::string &filepath, int topN)
+{
+    std::ifstream file(filepath);
+    std::map<std::string, int> freq;
+    std::string line;
+
+    while (std::getline(file, line))
+    {
+        if (line.empty())
+            continue;
+        std::vector<std::string> words = Tokenizer::tokenize(line);
+        for (const std::string &w : words)
+            freq[w]++;
+    }
+    file.close();
+
+    std::vector<std::pair<std::string, int>> sorted(freq.begin(), freq.end());
+    std::sort(sorted.begin(), sorted.end(), [](const auto &a, const auto &b)
+              { return a.second > b.second; });
+
+    std::vector<std::string> result;
+    for (int i = 0; i < std::min((int)sorted.size(), topN); ++i)
+        result.push_back(sorted[i].first);
+    return result;
+}
+
+// Test: nạp document từ file data/document.txt và kiểm tra search
+void testLoadDocumentsFromFile()
+{
+    std::cout << "\n=== Testing SearchEngine (load from document.txt) ===\n";
 
     SearchEngine engine;
     int loadedCount = loadDocumentsFromFile(engine, "data/document.txt");
 
-    check(loadedCount > 0, "doc duoc it nhat 1 document tu file");
-    std::cout << "  Da nap " << loadedCount << " document tu file.\n";
+    check(loadedCount > 0, "read at least one document from file");
+    std::cout << "  Loaded " << loadedCount << " documents from file.\n";
 
-    std::cout << "\n  Cay AVL index sau khi nap file:\n";
+    std::cout << "\n  AVL Tree after loading file:\n";
     std::cout << "    size   = " << engine.getIndexSize() << "\n";
     std::cout << "    height = " << engine.getIndexHeight() << "\n";
 
-    // Kiem tra mot vai tu chac chan co trong file mau (xem document.txt)
-    std::vector<int> resultApple = engine.search("apple");
-    check(!resultApple.empty(), "search('apple') tim thay it nhat 1 document");
+    // Lấy 2 từ xuất hiện nhiều nhất trong chính file document.txt (không hard-code)
+    std::vector<std::string> topWords = extractTopWords("data/document.txt", 2);
+    check(!topWords.empty(), "found at least 1 word from document.txt");
 
-    std::vector<int> resultBanana = engine.search("banana");
-    check(!resultBanana.empty(), "search('banana') tim thay it nhat 1 document");
+    if (!topWords.empty())
+    {
+        std::vector<int> result1 = engine.search(topWords[0]);
+        check(!result1.empty(), "search('" + topWords[0] + "') found at least 1 document");
 
-    std::vector<int> resultMissing = engine.search("zzzznotexist");
-    check(resultMissing.empty(), "search('zzzznotexist') tra ve rong vi tu khong ton tai");
-
-    std::cout << "\n  search('apple')  -> [";
-    for (size_t i = 0; i < resultApple.size(); ++i) {
-        std::cout << resultApple[i];
-        if (i + 1 < resultApple.size()) std::cout << ", ";
+        std::cout << "\n  search('" << topWords[0] << "')  -> [";
+        for (size_t i = 0; i < result1.size(); ++i)
+        {
+            std::cout << result1[i];
+            if (i + 1 < result1.size())
+                std::cout << ", ";
+        }
+        std::cout << "]\n";
     }
-    std::cout << "]\n";
 
-    std::cout << "  search('banana') -> [";
-    for (size_t i = 0; i < resultBanana.size(); ++i) {
-        std::cout << resultBanana[i];
-        if (i + 1 < resultBanana.size()) std::cout << ", ";
+    if (topWords.size() >= 2)
+    {
+        std::vector<int> result2 = engine.search(topWords[1]);
+        check(!result2.empty(), "search('" + topWords[1] + "') found at least 1 document");
+
+        std::cout << "  search('" << topWords[1] << "') -> [";
+        for (size_t i = 0; i < result2.size(); ++i)
+        {
+            std::cout << result2[i];
+            if (i + 1 < result2.size())
+                std::cout << ", ";
+        }
+        std::cout << "]\n";
     }
-    std::cout << "]\n";
+
+    // words not appear example
+    std::vector<int> resultMissing = engine.search("zzzznotexistxyz123");
+    check(resultMissing.empty(), "search('zzzznotexistxyz123') returns empty because it does not exist");
 }
 
-// ===== Test AVLTree =====
-void testAVLTreeOperations() {
+// Test AVLTree
+void testAVLTreeOperations()
+{
     std::cout << "\n=== Testing AVLTree ===\n";
 
     AVLTree<std::string, std::vector<int>> tree;
@@ -335,7 +400,7 @@ void testAVLTreeOperations() {
     tree.insert("c", {3});
     tree.insert("d", {4});
 
-    std::cout << "\n  Cay AVL sau khi insert b, a, c, d:\n";
+    std::cout << "\n  AVL tree after inserting b, a, c, d:\n";
     tree.printTreeStructure();
     std::cout << "\n";
 
@@ -349,7 +414,7 @@ void testAVLTreeOperations() {
 
     tree.remove("b");
 
-    std::cout << "\n  Cay AVL sau khi remove 'b':\n";
+    std::cout << "\n  AVL tree after removing 'b':\n";
     tree.printTreeStructure();
     std::cout << "\n";
 
@@ -364,7 +429,153 @@ void testAVLTreeOperations() {
     checkEqual<size_t>(tree.getSize(), 0, "tree size == 0 after clear()");
 }
 
-int main() {
+// Print benchmark result (data received from benchmark.cpp)
+void printBenchmarkResult(const BenchmarkResult &r)
+{
+    std::cout << "\n=== BENCHMARK: AVL Tree vs map vs unordered_map ===\n";
+
+    std::cout << std::left
+              << std::setw(20) << "Structure"
+              << std::setw(16) << "Search (ms)"
+              << std::setw(14) << "Avg Steps"
+              << std::setw(10) << "Height"
+              << "\n";
+    std::cout << std::string(60, '-') << "\n";
+
+    auto printRow = [](const StructureResult &s)
+    {
+        std::cout << std::left << std::setw(20) << s.name
+                  << std::setw(16) << std::fixed << std::setprecision(4) << s.searchTimeMs
+                  << std::setw(14);
+        if (s.avgSteps < 0)
+            std::cout << "-";
+        else
+            std::cout << std::fixed << std::setprecision(2) << s.avgSteps;
+        std::cout << std::setw(10);
+        if (s.height < 0)
+            std::cout << "-";
+        else
+            std::cout << s.height;
+        std::cout << "\n";
+    };
+
+    printRow(r.avl);
+    printRow(r.stdMap);
+    printRow(r.unorderedMap);
+
+    std::cout << "\nAVL tree height in reality: " << r.actualHeight
+              << " | In theory: (1.45 * log2(n)): "
+              << std::fixed << std::setprecision(2) << r.theoreticalHeight << "\n";
+}
+
+// simple search, ranked, boolean, fuzzy, stats, benchmark
+void runDemo()
+{
+    std::cout << "\n=== SEARCH ENGINE DEMO ===\n";
+
+    SearchEngine engine;
+    int loaded = loadDocumentsFromFile(engine, "data/document.txt");
+    std::cout << "Loaded " << loaded << " documents from data/document.txt\n";
+
+    // Take words from real file (ex: document.exe)
+    std::vector<std::string> topWords = extractTopWords("data/document.txt", 5);
+
+    if (topWords.empty())
+    {
+        std::cout << "\n[WARNING] Could not extract any keywords from document.txt, skipping demo.\n";
+        return;
+    }
+
+    // Basic search
+    std::cout << "\n--- Basic Search ---\n";
+    std::string keyword = topWords[0];
+    std::vector<int> basic = engine.search(keyword);
+    std::cout << "Search \"" << keyword << "\" -> Document IDs: [";
+    for (size_t i = 0; i < basic.size(); ++i)
+    {
+        std::cout << basic[i];
+        if (i + 1 < basic.size())
+            std::cout << ", ";
+    }
+    std::cout << "]\n";
+    std::cout << "  Steps taken (AVL tree): " << engine.getLastSearchSteps() << "\n";
+    engine.printDocs(basic);
+
+    // --- Ranked Search (TF-IDF) ---
+    std::cout << "\n--- Ranked Search (TF-IDF) ---\n";
+    std::vector<SearchEngine::ScoredDoc> ranked = engine.searchRanked(keyword);
+    std::cout << "Search \"" << keyword << "\" (ranked):\n";
+    int rank = 1;
+    for (const auto &sd : ranked)
+    {
+        std::cout << "  " << rank++ << ". Document " << sd.docId
+                  << " | score: " << std::fixed << std::setprecision(4) << sd.score
+                  << "\n";
+    }
+
+    // --- Boolean Query ---
+    // Dùng 2-3 từ khóa lấy được từ topWords thay vì hard-code, đảm bảo luôn có
+    // ý nghĩa với bất kỳ nội dung document.txt nào
+    std::cout << "\n--- Boolean Query ---\n";
+    std::string wordA = topWords[0];
+    std::string wordB = (topWords.size() >= 2) ? topWords[1] : topWords[0];
+    std::string wordC = (topWords.size() >= 3) ? topWords[2] : wordB;
+
+    std::vector<int> andResult = engine.searchAND({wordA, wordB});
+    std::vector<int> orResult = engine.searchOR({wordA, wordC});
+    auto printVec = [](const std::vector<int> &v)
+    {
+        std::cout << "[";
+        for (size_t i = 0; i < v.size(); ++i)
+        {
+            std::cout << v[i];
+            if (i + 1 < v.size())
+                std::cout << ", ";
+        }
+        std::cout << "]";
+    };
+    std::cout << "Search AND [\"" << wordA << "\", \"" << wordB << "\"] -> ";
+    printVec(andResult);
+    std::cout << "\n";
+    std::cout << "Search OR  [\"" << wordA << "\", \"" << wordC << "\"] -> ";
+    printVec(orResult);
+    std::cout << "\n";
+
+    // --- Fuzzy Search ---
+    // Tạo lỗi gõ bằng cách nhân đôi ký tự cuối của từ khóa thật -> chắc chắn không trùng với bất kỳ từ nào trong index (rất khó xảy ra trùng ngẫu nhiên)
+    std::cout << "\n--- Fuzzy Search ---\n";
+    std::string typo = keyword + std::string(1, keyword.back());
+    std::vector<int> fuzzyExact = engine.search(typo);
+    if (fuzzyExact.empty())
+    {
+        std::cout << "Search \"" << typo << "\" -> No exact match found.\n";
+        std::vector<std::string> suggestions = engine.suggestSimilar(typo, 3);
+        std::cout << "Did you mean: ";
+        for (size_t i = 0; i < suggestions.size(); ++i)
+        {
+            std::cout << "\"" << suggestions[i] << "\"";
+            if (i + 1 < suggestions.size())
+                std::cout << ", ";
+        }
+        std::cout << "\n";
+    }
+
+    // Index Stats
+    std::cout << "\n--- Index Stats ---\n";
+    std::cout << "Index height: " << engine.getIndexHeight() << "\n";
+    std::cout << "Index size (unique words): " << engine.getIndexSize() << "\n";
+    std::cout << "Total searches performed: " << SearchEngine::getSearchCount() << "\n";
+
+    // Benchmark
+    // Dùng topWords (đã trích từ document.txt) làm tập từ khóa benchmark
+    BenchmarkResult bench = runBenchmark(engine, topWords);
+    printBenchmarkResult(bench);
+
+    std::cout << "\nDemo finished.\n";
+}
+
+int main()
+{
     std::cout << "Running SearchEngine tests...\n";
 
     testTokenizer();
@@ -380,11 +591,16 @@ int main() {
     std::cout << "Failed:       " << g_failedChecks << "\n";
     std::cout << "========================================\n";
 
-    if (g_failedChecks == 0) {
+    if (g_failedChecks == 0)
+    {
         std::cout << "All tests passed.\n";
-        return 0;
-    } else {
-        std::cout << "SOME TESTS FAILED.\n";
-        return 1;
     }
+    else
+    {
+        std::cout << "SOME TESTS FAILED.\n";
+    }
+
+    runDemo();
+
+    return g_failedChecks == 0 ? 0 : 1;
 }
