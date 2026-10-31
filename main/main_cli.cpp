@@ -53,19 +53,25 @@ std::string jsonEscape(const std::string &s)
 
 // ===== In JSON cho từng mode =====
 
-void printJsonBasic(const std::vector<int> &docIds, SearchEngine &engine)
+void printJsonPositions(const std::vector<WordOccurrence> &positions)
 {
     std::cout << "[";
-    for (size_t i = 0; i < docIds.size(); ++i)
+    for (size_t p = 0; p < positions.size(); ++p)
     {
-        std::cout << docIds[i];
-        if (i + 1 < docIds.size())
+        const auto &pos = positions[p];
+        std::cout << "{"
+                  << "\"sentenceIndex\":" << pos.sentenceIndex
+                  << ",\"wordIndex\":" << pos.wordIndex
+                  << ",\"globalWordIndex\":" << pos.globalWordIndex
+                  << ",\"matchedWord\":\"" << jsonEscape(pos.matchedWord) << "\""
+                  << ",\"isExact\":" << (pos.isExact ? "true" : "false")
+                  << ",\"snippet\":\"" << jsonEscape(pos.sentenceText) << "\""
+                  << "}";
+        if (p + 1 < positions.size())
             std::cout << ",";
     }
     std::cout << "]";
 }
-
-#include "../utils/SentenceUtils.h"
 
 void printJsonRanked(const std::vector<SearchEngine::ScoredDoc> &results, SearchEngine &engine, const std::string &keyword)
 {
@@ -73,22 +79,50 @@ void printJsonRanked(const std::vector<SearchEngine::ScoredDoc> &results, Search
     for (size_t i = 0; i < results.size(); ++i)
     {
         std::string docText = engine.getDocText(results[i].docId);
-        std::vector<std::string> sentences = SentenceUtils::splitSentences(docText);
-        int sentIdx = SentenceUtils::findSentenceIndex(sentences, keyword);
+        std::vector<WordOccurrence> occurrences = SentenceUtils::findAllPositions(docText, keyword);
+        int sentIdx = occurrences.empty() ? -1 : occurrences[0].sentenceIndex;
+        std::string firstSnippet = occurrences.empty() ? "" : occurrences[0].sentenceText;
 
         std::cout << "{\"docId\":" << results[i].docId
                   << ",\"score\":" << results[i].score
                   << ",\"sentenceIndex\":" << sentIdx
-                  << ",\"sentenceText\":\"";
-        if (sentIdx >= 0)
-            std::cout << jsonEscape(sentences[sentIdx]);
-        std::cout << "\"}";
+                  << ",\"sentenceText\":\"" << jsonEscape(firstSnippet) << "\""
+                  << ",\"totalOccurrences\":" << occurrences.size()
+                  << ",\"positions\":";
+        printJsonPositions(occurrences);
+        std::cout << "}";
 
         if (i + 1 < results.size())
             std::cout << ",";
     }
     std::cout << "]";
 }
+
+void printJsonWithPositions(const std::vector<int> &docIds, SearchEngine &engine, const std::vector<std::string> &keywords)
+{
+    std::cout << "[";
+    for (size_t i = 0; i < docIds.size(); ++i)
+    {
+        int docId = docIds[i];
+        std::string docText = engine.getDocText(docId);
+        std::vector<WordOccurrence> occurrences = SentenceUtils::findAllPositions(docText, keywords);
+        int sentIdx = occurrences.empty() ? -1 : occurrences[0].sentenceIndex;
+        std::string firstSnippet = occurrences.empty() ? "" : occurrences[0].sentenceText;
+
+        std::cout << "{\"docId\":" << docId
+                  << ",\"sentenceIndex\":" << sentIdx
+                  << ",\"sentenceText\":\"" << jsonEscape(firstSnippet) << "\""
+                  << ",\"totalOccurrences\":" << occurrences.size()
+                  << ",\"positions\":";
+        printJsonPositions(occurrences);
+        std::cout << "}";
+
+        if (i + 1 < docIds.size())
+            std::cout << ",";
+    }
+    std::cout << "]";
+}
+ 
 
 void printJsonIntArray(const std::vector<int> &ids)
 {
@@ -165,7 +199,7 @@ int main(int argc, char *argv[])
     if (mode == "basic")
     {
         auto results = engine.search(keyword);
-        printJsonBasic(results, engine);
+        printJsonWithPositions(results, engine, {keyword});
     }
     else if (mode == "ranked")
     {
@@ -176,13 +210,13 @@ int main(int argc, char *argv[])
     {
         std::vector<std::string> keywords = splitByComma(keyword);
         auto results = engine.searchAND(keywords);
-        printJsonIntArray(results);
+        printJsonWithPositions(results, engine, keywords);
     }
     else if (mode == "or")
     {
         std::vector<std::string> keywords = splitByComma(keyword);
         auto results = engine.searchOR(keywords);
-        printJsonIntArray(results);
+        printJsonWithPositions(results, engine, keywords);
     }
     else if (mode == "suggest")
     {

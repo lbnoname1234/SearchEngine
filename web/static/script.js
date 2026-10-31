@@ -129,7 +129,8 @@ async function runSearch() {
       const res = await fetch(url);
       const data = await safeJson(res);
       if (data.error) throw new Error(data.error);
-      docIds = data.docIds;
+      ranked = data.results || [];
+      docIds = data.docIds || ranked.map(r => r.docId);
     }
  
     const elapsed = (performance.now() - t0).toFixed(1);
@@ -139,7 +140,7 @@ async function runSearch() {
       <span><b>${currentMode.toUpperCase()}</b> mode</span>
     `;
  
-    renderResults(docIds, ranked);
+    renderResults(docIds, ranked, q);
  
     if (docIds.length === 0) {
       const sres = await fetch(API.suggest(q.split(',')[0]));
@@ -156,7 +157,38 @@ async function runSearch() {
   }
 }
  
-function renderResults(docIds, ranked) {
+function escapeHtml(str) {
+  if (!str) return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function highlightKeywords(text, keywords, matchedTokens) {
+  let safe = escapeHtml(text);
+  const targets = [...new Set([
+    ...(matchedTokens || []),
+    ...(keywords || [])
+  ])].filter(w => w && w.trim().length > 0);
+
+  targets.sort((a, b) => b.length - a.length);
+
+  targets.forEach(t => {
+    try {
+      const re = new RegExp(`(${escapeRegex(t)})`, 'gi');
+      safe = safe.replace(re, '<mark class="kw-hl">$1</mark>');
+    } catch (_) {}
+  });
+  return safe;
+}
+
+function renderResults(docIds, items, query) {
   resultList.innerHTML = '';
   if (docIds.length === 0) {
     emptyState.textContent = 'Không tìm thấy document nào khớp.';
@@ -164,28 +196,86 @@ function renderResults(docIds, ranked) {
     return;
   }
   emptyState.classList.remove('show');
- 
-  const maxScore = ranked ? Math.max(...ranked.map(r => r.score), 0.0001) : 1;
- 
+
+  const queryTerms = (query || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+  const hasRanked = items && items.length > 0 && typeof items[0].score === 'number';
+  const maxScore = hasRanked ? Math.max(...items.map(r => r.score || 0), 0.0001) : 1;
+
   docIds.forEach((id, i) => {
-    const scoreObj = ranked ? ranked.find(r => r.docId === id) : null;
-    const score = scoreObj ? scoreObj.score : null;
+    const item = items ? items.find(r => r.docId === id) : null;
+    const score = (item && typeof item.score === 'number') ? item.score : null;
     const pct = score !== null ? Math.max(4, (score / maxScore) * 100) : 100;
- 
-    // Nếu backend trả về sentenceIndex hợp lệ (>= 0), hiện đúng câu chứa từ khóa.
-    // Nếu không (mode and/or, hoặc backend chưa hỗ trợ), fallback về dòng gợi ý cũ.
-    const sentInfo = (score !== null && scoreObj && scoreObj.sentenceIndex >= 0)
-      ? `Câu ${scoreObj.sentenceIndex + 1}: "${scoreObj.sentenceText}"`
-      : `Xem chi tiết trong ${currentCorpusFile} tại dòng ${id}`;
- 
+    const positions = (item && Array.isArray(item.positions)) ? item.positions : [];
+    const totalOccurrences = item ? (item.totalOccurrences || positions.length) : 0;
+
+    const sentenceMap = new Map();
+    positions.forEach(p => {
+      if (!sentenceMap.has(p.sentenceIndex)) {
+        sentenceMap.set(p.sentenceIndex, {
+          sentenceIndex: p.sentenceIndex,
+          snippet: p.snippet,
+          matchedTokens: []
+        });
+      }
+      sentenceMap.get(p.sentenceIndex).matchedTokens.push(p.matchedWord);
+    });
+
+    let positionsPillsHtml = '';
+    if (positions.length > 0) {
+      positionsPillsHtml = `
+        <div class="pos-pills-row">
+          <span class="pos-label">Positions:</span>
+          ${positions.map((p, pIdx) => `
+            <span class="pos-pill ${p.isExact ? 'exact' : 'element'}" title="${p.isExact ? 'Exact word match' : 'Sub-word/element match'}: '${escapeHtml(p.matchedWord)}'">
+              #${pIdx + 1} Sent ${p.sentenceIndex + 1}, Word ${p.wordIndex + 1}
+              ${!p.isExact ? `<small class="subword-tag">(in "${escapeHtml(p.matchedWord)}")</small>` : ''}
+            </span>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    let snippetsHtml = '';
+    if (sentenceMap.size > 0) {
+      snippetsHtml = `
+        <div class="snippets-container">
+          ${Array.from(sentenceMap.values()).map(s => {
+            const highlighted = highlightKeywords(s.snippet, queryTerms, s.matchedTokens);
+            return `
+              <div class="snippet-line">
+                <span class="sent-num">Sentence ${s.sentenceIndex + 1}:</span>
+                <span class="sent-text">"${highlighted}"</span>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    } else if (item && item.sentenceIndex >= 0 && item.sentenceText) {
+      const highlighted = highlightKeywords(item.sentenceText, queryTerms, []);
+      snippetsHtml = `
+        <div class="snippets-container">
+          <div class="snippet-line">
+            <span class="sent-num">Sentence ${item.sentenceIndex + 1}:</span>
+            <span class="sent-text">"${highlighted}"</span>
+          </div>
+        </div>
+      `;
+    } else {
+      snippetsHtml = `<div class="result-text">Xem chi tiết trong ${currentCorpusFile || 'corpus'} tại dòng ${id}</div>`;
+    }
+
     const card = document.createElement('div');
     card.className = 'result-card';
     card.style.animationDelay = `${i * 0.04}s`;
     card.innerHTML = `
       <span class="result-rank">${String(i + 1).padStart(2, '0')}</span>
       <div class="result-main">
-        <div class="result-title">Paragraph ${id}</div>
-        <div class="result-text">${sentInfo}</div>
+        <div class="result-title">
+          Paragraph ${id}
+          ${totalOccurrences > 0 ? `<span class="occurrence-pill">${totalOccurrences} match${totalOccurrences > 1 ? 'es' : ''}</span>` : ''}
+        </div>
+        ${positionsPillsHtml}
+        ${snippetsHtml}
       </div>
       ${score !== null ? `
       <div class="result-score">
@@ -196,7 +286,7 @@ function renderResults(docIds, ranked) {
     resultList.appendChild(card);
   });
 }
- 
+
 // ===== Add document (từ thanh tìm kiếm, mode ADD) =====
 const uploadStatus = document.getElementById('uploadStatus');
  

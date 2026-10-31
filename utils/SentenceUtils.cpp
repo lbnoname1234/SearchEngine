@@ -134,3 +134,72 @@ int SentenceUtils::findSentenceIndex(const std::vector<std::string> &sentences, 
     }
     return -1;
 }
+
+
+std::vector<WordOccurrence> SentenceUtils::findAllPositions(const std::string &docText, const std::string &keyword)
+{
+    if (keyword.empty())
+        return {};
+    return findAllPositions(docText, std::vector<std::string>{keyword});
+}
+
+std::vector<WordOccurrence> SentenceUtils::findAllPositions(const std::string &docText, const std::vector<std::string> &keywords)
+{
+    std::vector<WordOccurrence> occurrences;
+    if (docText.empty() || keywords.empty())
+        return occurrences;
+
+    std::vector<std::string> cleanKws;
+    for (const auto &kw : keywords)
+    {
+        std::string lower = kw;
+        for (char &c : lower)
+            c = tolower((unsigned char)c);
+        if (!lower.empty())
+            cleanKws.push_back(lower);
+    }
+    if (cleanKws.empty())
+        return occurrences;
+
+    std::vector<std::string> sentences = splitSentences(docText);
+    int globalWordOffset = 0;
+
+    for (size_t sIdx = 0; sIdx < sentences.size(); ++sIdx)
+    {
+        std::vector<std::string> words = Tokenizer::tokenize(sentences[sIdx]);
+        for (size_t wIdx = 0; wIdx < words.size(); ++wIdx)
+        {
+            const std::string &w = words[wIdx];
+            for (const auto &kw : cleanKws)
+            {
+                if (w == kw)
+                {
+                    occurrences.push_back({
+                        (int)sIdx,
+                        (int)wIdx,
+                        globalWordOffset + (int)wIdx,
+                        w,
+                        true,
+                        sentences[sIdx]
+                    });
+                    break;
+                }
+                else if (w.find(kw) != std::string::npos)
+                {
+                    occurrences.push_back({
+                        (int)sIdx,
+                        (int)wIdx,
+                        globalWordOffset + (int)wIdx,
+                        w,
+                        false,
+                        sentences[sIdx]
+                    });
+                    break;
+                }
+            }
+        }
+        globalWordOffset += (int)words.size();
+    }
+
+    return occurrences;
+}

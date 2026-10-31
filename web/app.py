@@ -63,7 +63,8 @@ def search_basic():
         return error_response(ValueError("Thieu tham so q"), 400)
     try:
         data = call_cpp("basic", keyword)
-        return jsonify({"docIds": data})
+        doc_ids = [d["docId"] if isinstance(d, dict) else d for d in data]
+        return jsonify({"docIds": doc_ids, "results": data})
     except RuntimeError as e:
         return error_response(e)
 
@@ -75,7 +76,8 @@ def search_ranked():
         return error_response(ValueError("Thieu tham so q"), 400)
     try:
         data = call_cpp("ranked", keyword)
-        return jsonify({"results": data})
+        doc_ids = [d["docId"] if isinstance(d, dict) else d for d in data]
+        return jsonify({"docIds": doc_ids, "results": data})
     except RuntimeError as e:
         return error_response(e)
 
@@ -87,7 +89,8 @@ def search_and():
         return error_response(ValueError("Thieu tham so q"), 400)
     try:
         data = call_cpp("and", keywords)
-        return jsonify({"docIds": data})
+        doc_ids = [d["docId"] if isinstance(d, dict) else d for d in data]
+        return jsonify({"docIds": doc_ids, "results": data})
     except RuntimeError as e:
         return error_response(e)
 
@@ -99,7 +102,8 @@ def search_or():
         return error_response(ValueError("Thieu tham so q"), 400)
     try:
         data = call_cpp("or", keywords)
-        return jsonify({"docIds": data})
+        doc_ids = [d["docId"] if isinstance(d, dict) else d for d in data]
+        return jsonify({"docIds": doc_ids, "results": data})
     except RuntimeError as e:
         return error_response(e)
 
