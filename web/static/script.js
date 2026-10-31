@@ -171,21 +171,36 @@ function escapeRegex(str) {
 }
 
 function highlightKeywords(text, keywords, matchedTokens) {
-  let safe = escapeHtml(text);
+  if (!text) return '';
+  // Xóa BOM \uFEFF nếu có
+  let cleanText = text.replace(/^\uFEFF/, '');
+
   const targets = [...new Set([
     ...(matchedTokens || []),
     ...(keywords || [])
-  ])].filter(w => w && w.trim().length > 0);
+  ])].map(w => (w || '').trim()).filter(w => w.length > 0);
 
+  if (targets.length === 0) return escapeHtml(cleanText);
+
+  // Sắp xếp dài trước ngắn sau để ưu tiên từ dài khớp trước
   targets.sort((a, b) => b.length - a.length);
 
-  targets.forEach(t => {
-    try {
-      const re = new RegExp(`(${escapeRegex(t)})`, 'gi');
-      safe = safe.replace(re, '<mark class="kw-hl">$1</mark>');
-    } catch (_) {}
-  });
-  return safe;
+  try {
+    const pattern = new RegExp('(' + targets.map(escapeRegex).join('|') + ')', 'gi');
+    const lowerTargets = new Set(targets.map(t => t.toLowerCase()));
+
+    // Tách 1 lượt duy nhất trên text gốc, không bao giờ replace đè lên thẻ HTML đã chèn
+    return cleanText.split(pattern).map(part => {
+      if (!part) return '';
+      const safe = escapeHtml(part);
+      if (lowerTargets.has(part.toLowerCase())) {
+        return `<mark class="kw-hl">${safe}</mark>`;
+      }
+      return safe;
+    }).join('');
+  } catch (_) {
+    return escapeHtml(cleanText);
+  }
 }
 
 function renderResults(docIds, items, query) {
@@ -390,9 +405,30 @@ function renderFileList(files) {
   fileChipsContainer.innerHTML = '';
 
   if (!files || files.length === 0) {
-    fileChipsContainer.innerHTML = '<span class="empty-files-msg">No files imported. Upload a .txt file to index.</span>';
+    fileChipsContainer.innerHTML = '<span class="empty-files-msg">No files imported. <button type="button" class="reset-sample-btn" id="resetSampleBtn">Reload sample corpus</button> or upload a .txt file.</span>';
     if (clearAllFilesBtn) clearAllFilesBtn.style.display = 'none';
     currentCorpusFile = '';
+    const resetBtn = document.getElementById('resetSampleBtn');
+    if (resetBtn) {
+      resetBtn.addEventListener('click', async () => {
+        try {
+          const res = await fetch('/api/documents/reset_sample', { method: 'POST' });
+          const data = await safeJson(res);
+          if (data.error) throw new Error(data.error);
+          renderFileList(data.files);
+          updateIndexMeta(data.stats);
+          pulseTree();
+          uploadStatus.textContent = 'Restored sample documents ✓';
+          uploadStatus.classList.remove('error');
+          if (searchInput.value.trim() && currentMode !== 'add') {
+            runSearch();
+          }
+        } catch (err) {
+          uploadStatus.textContent = `Lỗi khôi phục: ${err.message}`;
+          uploadStatus.classList.add('error');
+        }
+      });
+    }
     return;
   }
 

@@ -294,6 +294,18 @@ int loadDocumentsFromFile(SearchEngine &engine, const std::string &filepath)
     int count = 0;
     while (std::getline(file, line))
     {
+        // Loại bỏ BOM UTF-8 (\xEF\xBB\xBF) nếu có ở đầu dòng
+        if (line.size() >= 3 &&
+            (unsigned char)line[0] == 0xEF &&
+            (unsigned char)line[1] == 0xBB &&
+            (unsigned char)line[2] == 0xBF)
+        {
+            line = line.substr(3);
+        }
+        if (!line.empty() && line.back() == '\r')
+        {
+            line.pop_back();
+        }
         if (line.empty())
             continue;
         engine.addDocument(line);

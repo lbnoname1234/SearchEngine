@@ -1,4 +1,4 @@
-﻿AVL tree is a self-balancing binary search tree
+AVL tree is a self-balancing binary search tree
 Hash table provides average constant time search
 Insertion in AVL tree requires rotation to maintain balance
 Balance factor of every node in AVL tree must be -1 0 or 1

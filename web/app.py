@@ -165,7 +165,7 @@ def rebuild_corpus_from_uploads():
         fname = item["filename"]
         fpath = os.path.join(UPLOADS_DIR, fname)
         if os.path.exists(fpath):
-            with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+            with open(fpath, "r", encoding="utf-8-sig", errors="replace") as f:
                 file_lines = [l.strip() for l in f if l.strip()]
             all_lines.extend(file_lines)
             updated_meta.append({"filename": fname, "docCount": len(file_lines)})
@@ -178,21 +178,32 @@ def rebuild_corpus_from_uploads():
     return updated_meta
 
 
+DEFAULT_SAMPLE_TEXT = """AVL tree is a self-balancing binary search tree
+Hash table provides average constant time search
+Insertion in AVL tree requires rotation to maintain balance
+Balance factor of every node in AVL tree must be -1 0 or 1
+AVL tree height is always O(log n) due to strict balancing
+Binary search tree without balancing can degrade to O(n)
+Red black tree is another type of self-balancing tree
+Rotation operations include left rotation and right rotation
+Hash collision can be resolved using chaining or open addressing
+Search engine uses inverted index to map keyword to documents
+"""
+
+
 def init_uploads():
     """Khởi tạo danh sách file ban đầu nếu chưa có meta."""
-    if not os.path.exists(META_FILE):
-        initial_files = []
-        if os.path.exists(DATA_FILE):
-            with open(DATA_FILE, "r", encoding="utf-8", errors="replace") as f:
-                lines = [l.strip() for l in f if l.strip()]
-            if lines:
-                seed_name = "document.txt"
-                seed_path = os.path.join(UPLOADS_DIR, seed_name)
-                with open(seed_path, "w", encoding="utf-8") as f:
-                    for l in lines:
-                        f.write(l + "\n")
-                initial_files.append({"filename": seed_name, "docCount": len(lines)})
-        save_meta(initial_files)
+    meta = load_meta()
+    if not meta:
+        sample_name = "sample_docs.txt"
+        sample_path = os.path.join(UPLOADS_DIR, sample_name)
+        if not os.path.exists(sample_path):
+            lines = [l.strip() for l in DEFAULT_SAMPLE_TEXT.splitlines() if l.strip()]
+            with open(sample_path, "w", encoding="utf-8") as f:
+                for l in lines:
+                    f.write(l + "\n")
+        save_meta([{"filename": sample_name, "docCount": 10}])
+        rebuild_corpus_from_uploads()
 
 
 init_uploads()
@@ -253,7 +264,7 @@ def upload_documents():
     safe_filename = os.path.basename(file.filename).strip() or "uploaded_document.txt"
 
     try:
-        content = file.read().decode("utf-8", errors="replace")
+        content = file.read().decode("utf-8-sig", errors="replace")
         lines = [l.strip() for l in content.splitlines() if l.strip()]
         if not lines:
             return error_response(ValueError("File rong hoac khong co dong hop le"), 400)
@@ -336,6 +347,26 @@ def clear_all_documents():
         return jsonify({
             "cleared": True,
             "files": [],
+            "stats": call_cpp("stats")
+        })
+    except (RuntimeError, OSError) as e:
+        return error_response(e)
+
+
+@app.route("/api/documents/reset_sample", methods=["POST"])
+def reset_sample_documents():
+    try:
+        sample_name = "sample_docs.txt"
+        sample_path = os.path.join(UPLOADS_DIR, sample_name)
+        lines = [l.strip() for l in DEFAULT_SAMPLE_TEXT.splitlines() if l.strip()]
+        with open(sample_path, "w", encoding="utf-8") as f:
+            for l in lines:
+                f.write(l + "\n")
+        save_meta([{"filename": sample_name, "docCount": len(lines)}])
+        updated_files = rebuild_corpus_from_uploads()
+        return jsonify({
+            "reset": True,
+            "files": updated_files,
             "stats": call_cpp("stats")
         })
     except (RuntimeError, OSError) as e:

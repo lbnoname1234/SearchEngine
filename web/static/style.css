@@ -665,6 +665,7 @@
 }
 
 .snippet-line {
+  font-family: var(--sans);
   font-size: 13.5px;
   line-height: 1.5;
   color: var(--text-muted);
@@ -682,11 +683,36 @@
   font-weight: 500;
 }
 
+.sent-text {
+  font-family: inherit;
+  font-style: normal;
+  color: var(--text);
+}
+
 mark.kw-hl {
+  font-family: inherit;
   background: rgba(230, 180, 50, 0.25);
   color: #ffe685;
   border-bottom: 2px solid #e5b332;
-  padding: 1px 4px;
+  padding: 1px 3px;
   border-radius: 3px;
   font-weight: 600;
+}
+
+.reset-sample-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--amber);
+  font-family: var(--sans);
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin: 0 4px;
+  transition: all 0.15s ease;
+}
+
+.reset-sample-btn:hover {
+  background: rgba(184, 128, 42, 0.15);
+  border-color: var(--amber);
 }

@@ -33,11 +33,22 @@ static std::string getLastWord(const std::string &current)
 std::vector<std::string> SentenceUtils::splitSentences(const std::string &text)
 {
     std::vector<std::string> sentences;
+    std::string cleanText = text;
+
+    // Bỏ qua ký tự BOM UTF-8 (\xEF\xBB\xBF) nếu có ở đầu văn bản
+    if (cleanText.size() >= 3 &&
+        (unsigned char)cleanText[0] == 0xEF &&
+        (unsigned char)cleanText[1] == 0xBB &&
+        (unsigned char)cleanText[2] == 0xBF)
+    {
+        cleanText = cleanText.substr(3);
+    }
+
     std::string current;
 
-    for (size_t i = 0; i < text.size(); ++i)
+    for (size_t i = 0; i < cleanText.size(); ++i)
     {
-        char c = text[i];
+        char c = cleanText[i];
         current += c;
 
         bool isEnder = (c == '.' || c == '!' || c == '?');
@@ -45,8 +56,8 @@ std::vector<std::string> SentenceUtils::splitSentences(const std::string &text)
             continue;
 
         // Bỏ qua nếu dấu '.' nằm giữa 2 chữ số (số thập phân, vd "3.14")
-        if (c == '.' && i > 0 && i + 1 < text.size() &&
-            isdigit((unsigned char)text[i - 1]) && isdigit((unsigned char)text[i + 1]))
+        if (c == '.' && i > 0 && i + 1 < cleanText.size() &&
+            isdigit((unsigned char)cleanText[i - 1]) && isdigit((unsigned char)cleanText[i + 1]))
         {
             continue;
         }
@@ -63,9 +74,9 @@ std::vector<std::string> SentenceUtils::splitSentences(const std::string &text)
 
         // Gộp các dấu thành 1 điểm kết cấu duy nhất (vd "..." "?!")
         size_t j = i + 1;
-        while (j < text.size() && (text[j] == '.' || text[j] == '!' || text[j] == '?'))
+        while (j < cleanText.size() && (cleanText[j] == '.' || cleanText[j] == '!' || cleanText[j] == '?'))
         {
-            current += text[j];
+            current += cleanText[j];
             j++;
         }
         i = j - 1;
