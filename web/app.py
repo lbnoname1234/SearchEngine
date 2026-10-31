@@ -5,9 +5,12 @@ from flask import Flask, jsonify, request, render_template
 
 app = Flask(__name__)
 
-# Đường dẫn tới file .exe đã build từ main_cli.cpp
-# Đặt search_cli.exe cùng thư mục với app.py, hoặc sửa lại đường dẫn tuyệt đối
-CLI_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "search_cli.exe")
+# Đường dẫn tới binary đã build từ main_cli.cpp
+# Tự động chọn search_cli.exe (Windows) hoặc search_cli (Linux/Render)
+_base_dir = os.path.dirname(os.path.abspath(__file__))
+_win_cli = os.path.join(_base_dir, "search_cli.exe")
+_linux_cli = os.path.join(_base_dir, "search_cli")
+CLI_PATH = _win_cli if os.path.isfile(_win_cli) else _linux_cli
 
 
 def call_cpp(mode: str, keyword: str = ""):
@@ -177,4 +180,5 @@ def upload_documents():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)
