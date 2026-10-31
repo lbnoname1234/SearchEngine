@@ -3,9 +3,11 @@
 
 #include <string>
 using namespace std;
-struct Document {
+struct Document
+{
     int id;
     string text;
+    int wordCount = 0;
 };
 
 #endif

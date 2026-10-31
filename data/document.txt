@@ -1,15 +1,10 @@
-﻿apple banana cherry
-banana orange apple
-orange grape fig
-fig date elderberry
-date apple cherry banana
-the quick brown fox jumps over the lazy dog
-a journey of a thousand miles begins with a single step
-search engines use inverted index to find documents quickly
-binary search trees keep data sorted for fast lookup
-avl trees automatically balance themselves after insertion and deletion
-the rain in spain falls mainly on the plain
-practice makes perfect when learning data structures and algorithms
-hello world this is a simple test document
-banana smoothie with apple and a hint of orange juice
-elderberry jam pairs well with fresh baked bread
+﻿AVL tree is a self-balancing binary search tree
+Hash table provides average constant time search
+Insertion in AVL tree requires rotation to maintain balance
+Balance factor of every node in AVL tree must be -1 0 or 1
+AVL tree height is always O(log n) due to strict balancing
+Binary search tree without balancing can degrade to O(n)
+Red black tree is another type of self-balancing tree
+Rotation operations include left rotation and right rotation
+Hash collision can be resolved using chaining or open addressing
+Search engine uses inverted index to map keyword to documents
