@@ -186,7 +186,11 @@ function highlightKeywords(text, keywords, matchedTokens) {
   targets.sort((a, b) => b.length - a.length);
 
   try {
-    const pattern = new RegExp('(' + targets.map(escapeRegex).join('|') + ')', 'gi');
+    const regexParts = targets.map(t => {
+      const esc = escapeRegex(t);
+      return t.length === 1 ? `\\b${esc}\\b` : esc;
+    });
+    const pattern = new RegExp('(' + regexParts.join('|') + ')', 'gi');
     const lowerTargets = new Set(targets.map(t => t.toLowerCase()));
 
     // Tách 1 lượt duy nhất trên text gốc, không bao giờ replace đè lên thẻ HTML đã chèn

@@ -147,6 +147,58 @@ int SentenceUtils::findSentenceIndex(const std::vector<std::string> &sentences, 
 }
 
 
+static size_t commonPrefixLength(const std::string &s1, const std::string &s2)
+{
+    size_t n = std::min(s1.size(), s2.size());
+    size_t i = 0;
+    while (i < n && s1[i] == s2[i])
+        i++;
+    return i;
+}
+
+static bool isSubwordElement(const std::string &word, const std::string &kw)
+{
+    // Từ đơn ngắn (như 1 ký tự 'a', 'b') không bao giờ coi là từ con/element của từ khác
+    if (kw.length() < 2 || word.length() <= kw.length())
+        return false;
+
+    // 1. Kiểm tra từ ghép phân tách bởi '-', '_', '/' (ví dụ "self-balancing", "sub-tree")
+    size_t start = 0;
+    while (start < word.size())
+    {
+        size_t delim = word.find_first_of("-_/", start);
+        if (delim == std::string::npos)
+            delim = word.size();
+        std::string part = word.substr(start, delim - start);
+        if (!part.empty())
+        {
+            if (part == kw)
+                return true;
+            if (kw.length() >= 3)
+            {
+                if (part.find(kw) != std::string::npos)
+                    return true;
+                size_t c = commonPrefixLength(part, kw);
+                if (c >= 4 && c >= std::min(part.size(), kw.size()) - 2)
+                    return true;
+            }
+        }
+        start = delim + 1;
+    }
+
+    // 2. Kiểm tra tiếp đầu ngữ hoặc gốc từ trên toàn bộ từ (ví dụ "balancing" và "balance")
+    if (kw.length() >= 3)
+    {
+        if (word.rfind(kw, 0) == 0)
+            return true;
+        size_t c = commonPrefixLength(word, kw);
+        if (c >= 4 && c >= std::min(word.size(), kw.size()) - 2)
+            return true;
+    }
+
+    return false;
+}
+
 std::vector<WordOccurrence> SentenceUtils::findAllPositions(const std::string &docText, const std::string &keyword)
 {
     if (keyword.empty())
@@ -195,7 +247,7 @@ std::vector<WordOccurrence> SentenceUtils::findAllPositions(const std::string &d
                     });
                     break;
                 }
-                else if (w.find(kw) != std::string::npos)
+                else if (isSubwordElement(w, kw))
                 {
                     occurrences.push_back({
                         (int)sIdx,
