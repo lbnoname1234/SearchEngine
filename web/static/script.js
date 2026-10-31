@@ -216,6 +216,7 @@ async function addDocument() {
  
     searchInput.value = '';
     statRow.innerHTML = `<span style="color:var(--accent)">Đã thêm document mới ✓</span>`;
+    if (data.files) renderFileList(data.files);
     updateIndexMeta(data.stats);
     pulseTree();
   } catch (err) {
@@ -273,6 +274,7 @@ fileInput.addEventListener('change', async () => {
     uploadStatus.textContent = isReplace
       ? `Đã thay thế toàn bộ bằng ${data.added} document từ "${file.name}" ✓`
       : `Đã thêm ${data.added} document từ "${file.name}" ✓`;
+    if (data.files) renderFileList(data.files);
     updateIndexMeta(data.stats);
     pulseTree();
   } catch (err) {
@@ -289,11 +291,111 @@ function updateIndexMeta(stats) {
     `${stats.docCount} documents · ${stats.indexSize} từ duy nhất · height ${stats.height}`;
 }
  
+// ===== File Management: Current Files & Removal =====
+const fileChipsContainer = document.getElementById('fileChipsContainer');
+const clearAllFilesBtn = document.getElementById('clearAllFilesBtn');
+
+function renderFileList(files) {
+  if (!fileChipsContainer) return;
+  fileChipsContainer.innerHTML = '';
+
+  if (!files || files.length === 0) {
+    fileChipsContainer.innerHTML = '<span class="empty-files-msg">No files imported. Upload a .txt file to index.</span>';
+    if (clearAllFilesBtn) clearAllFilesBtn.style.display = 'none';
+    currentCorpusFile = '';
+    return;
+  }
+
+  if (clearAllFilesBtn) clearAllFilesBtn.style.display = 'inline-block';
+  currentCorpusFile = files.map(f => f.filename).join(', ');
+
+  files.forEach(f => {
+    const chip = document.createElement('div');
+    chip.className = 'file-chip';
+    chip.innerHTML = `
+      <span class="file-chip-icon">📄</span>
+      <span class="file-chip-name" title="${f.filename}">${f.filename}</span>
+      <span class="file-chip-badge">${f.docCount} docs</span>
+      <button class="file-chip-del" data-filename="${f.filename}" title="Remove ${f.filename}">✕</button>
+    `;
+
+    chip.querySelector('.file-chip-del').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const fname = f.filename;
+      if (!confirm(`Are you sure you want to remove "${fname}" from the search index?`)) return;
+
+      try {
+        const res = await fetch('/api/documents/remove', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: fname })
+        });
+        const data = await safeJson(res);
+        if (data.error) throw new Error(data.error);
+
+        renderFileList(data.files);
+        updateIndexMeta(data.stats);
+        pulseTree();
+        uploadStatus.textContent = `Removed file "${fname}" ✓`;
+        uploadStatus.classList.remove('error');
+
+        if (data.stats && data.stats.docCount === 0) {
+          resultList.innerHTML = '';
+          emptyState.textContent = 'Index is now empty. Upload a .txt file to search.';
+          emptyState.classList.add('show');
+        } else if (searchInput.value.trim() && currentMode !== 'add') {
+          runSearch();
+        }
+      } catch (err) {
+        uploadStatus.textContent = `Lỗi xóa file: ${err.message}`;
+        uploadStatus.classList.add('error');
+      }
+    });
+
+    fileChipsContainer.appendChild(chip);
+  });
+}
+
+if (clearAllFilesBtn) {
+  clearAllFilesBtn.addEventListener('click', async () => {
+    if (!confirm('Are you sure you want to remove ALL imported files and clear the search index?')) return;
+
+    try {
+      const res = await fetch('/api/documents/clear', { method: 'POST' });
+      const data = await safeJson(res);
+      if (data.error) throw new Error(data.error);
+
+      renderFileList([]);
+      updateIndexMeta(data.stats);
+      pulseTree();
+      uploadStatus.textContent = 'Cleared all files from index ✓';
+      uploadStatus.classList.remove('error');
+      resultList.innerHTML = '';
+      emptyState.textContent = 'Index is empty. Upload a .txt file to begin.';
+      emptyState.classList.add('show');
+    } catch (err) {
+      uploadStatus.textContent = `Lỗi xóa toàn bộ: ${err.message}`;
+      uploadStatus.classList.add('error');
+    }
+  });
+}
+
+async function loadFiles() {
+  try {
+    const res = await fetch('/api/documents/files');
+    const data = await safeJson(res);
+    if (!data.error && data.files) {
+      renderFileList(data.files);
+    }
+  } catch (_) { }
+}
+
 async function loadStats() {
   try {
     const res = await fetch('/api/stats');
     const data = await safeJson(res);
     if (!data.error) updateIndexMeta(data);
+    loadFiles();
   } catch (_) { /* im lặng nếu chưa sẵn sàng */ }
 }
 loadStats();

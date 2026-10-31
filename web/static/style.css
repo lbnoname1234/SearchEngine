@@ -486,3 +486,113 @@
     outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
+
+
+/* ===== Imported Files Management ===== */
+.imported-files-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  transition: border-color 0.15s;
+}
+.imported-files-card:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+}
+.imported-files-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.imported-files-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+.imported-files-title svg {
+  color: var(--accent);
+}
+.clear-corpus-btn {
+  background: transparent;
+  border: 1px solid rgba(224, 82, 82, 0.3);
+  color: var(--danger);
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.clear-corpus-btn:hover {
+  background: rgba(224, 82, 82, 0.12);
+  border-color: var(--danger);
+}
+.file-chips-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  align-items: center;
+}
+.file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 5px 10px 5px 12px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text);
+  transition: border-color 0.15s, background 0.15s;
+}
+.file-chip:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.07);
+}
+.file-chip-icon {
+  font-size: 13px;
+}
+.file-chip-name {
+  font-weight: 500;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file-chip-badge {
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-size: 10.5px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+.file-chip-del {
+  background: transparent;
+  border: none;
+  color: var(--text-faint);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 4px;
+  margin-left: 2px;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+.file-chip-del:hover {
+  color: var(--danger);
+  background: rgba(224, 82, 82, 0.15);
+}
+.empty-files-msg {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-faint);
+  font-style: italic;
+}

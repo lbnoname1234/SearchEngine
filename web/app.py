@@ -127,8 +127,71 @@ def benchmark():
         return error_response(e)
 
 
-# ===== Đường dẫn tới data/document.txt, dùng cho add/upload =====
-DATA_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "document.txt")
+# ===== Quản lý file corpus và thư mục upload =====
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+DATA_FILE = os.path.join(DATA_DIR, "document.txt")
+UPLOADS_DIR = os.path.join(DATA_DIR, "uploads")
+META_FILE = os.path.join(DATA_DIR, "files_meta.json")
+
+os.makedirs(UPLOADS_DIR, exist_ok=True)
+
+
+def load_meta():
+    if os.path.exists(META_FILE):
+        try:
+            with open(META_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return []
+
+
+def save_meta(files_list):
+    with open(META_FILE, "w", encoding="utf-8") as f:
+        json.dump(files_list, f, ensure_ascii=False, indent=2)
+
+
+def rebuild_corpus_from_uploads():
+    """Gộp tất cả file trong uploads/ vào document.txt theo danh sách meta."""
+    meta = load_meta()
+    all_lines = []
+    updated_meta = []
+
+    for item in meta:
+        fname = item["filename"]
+        fpath = os.path.join(UPLOADS_DIR, fname)
+        if os.path.exists(fpath):
+            with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                file_lines = [l.strip() for l in f if l.strip()]
+            all_lines.extend(file_lines)
+            updated_meta.append({"filename": fname, "docCount": len(file_lines)})
+
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        for line in all_lines:
+            f.write(line + "\n")
+
+    save_meta(updated_meta)
+    return updated_meta
+
+
+def init_uploads():
+    """Khởi tạo danh sách file ban đầu nếu chưa có meta."""
+    if not os.path.exists(META_FILE):
+        initial_files = []
+        if os.path.exists(DATA_FILE):
+            with open(DATA_FILE, "r", encoding="utf-8", errors="replace") as f:
+                lines = [l.strip() for l in f if l.strip()]
+            if lines:
+                seed_name = "document.txt"
+                seed_path = os.path.join(UPLOADS_DIR, seed_name)
+                with open(seed_path, "w", encoding="utf-8") as f:
+                    for l in lines:
+                        f.write(l + "\n")
+                initial_files.append({"filename": seed_name, "docCount": len(lines)})
+        save_meta(initial_files)
+
+
+init_uploads()
 
 
 @app.route("/api/stats")
@@ -136,6 +199,14 @@ def stats():
     try:
         return jsonify(call_cpp("stats"))
     except RuntimeError as e:
+        return error_response(e)
+
+
+@app.route("/api/documents/files")
+def list_files():
+    try:
+        return jsonify({"files": load_meta()})
+    except Exception as e:
         return error_response(e)
 
 
@@ -148,9 +219,23 @@ def add_document():
     if "\n" in text:
         return error_response(ValueError("Document khong duoc chua xuong dong"), 400)
     try:
-        with open(DATA_FILE, "a", encoding="utf-8") as f:
+        manual_name = "manual_notes.txt"
+        manual_path = os.path.join(UPLOADS_DIR, manual_name)
+        with open(manual_path, "a", encoding="utf-8") as f:
             f.write(text + "\n")
-        return jsonify({"added": True, "stats": call_cpp("stats")})
+
+        meta = load_meta()
+        found = False
+        for m in meta:
+            if m["filename"] == manual_name:
+                found = True
+                break
+        if not found:
+            meta.append({"filename": manual_name, "docCount": 1})
+            save_meta(meta)
+
+        updated_files = rebuild_corpus_from_uploads()
+        return jsonify({"added": True, "files": updated_files, "stats": call_cpp("stats")})
     except (RuntimeError, OSError) as e:
         return error_response(e)
 
@@ -160,22 +245,96 @@ def upload_documents():
     if "file" not in request.files or request.files["file"].filename == "":
         return error_response(ValueError("Chua chon file"), 400)
     file = request.files["file"]
-    # mode = "replace" -> xoa sach du lieu cu truoc khi ghi file moi vao
-    # mode = "append" (mac dinh) -> giu nguyen du lieu cu, chi them vao cuoi
     upload_mode = request.form.get("mode", "append")
+    safe_filename = os.path.basename(file.filename).strip() or "uploaded_document.txt"
+
     try:
         content = file.read().decode("utf-8", errors="replace")
         lines = [l.strip() for l in content.splitlines() if l.strip()]
         if not lines:
             return error_response(ValueError("File rong hoac khong co dong hop le"), 400)
 
-        write_mode = "w" if upload_mode == "replace" else "a"
-        with open(DATA_FILE, write_mode, encoding="utf-8") as f:
+        if upload_mode == "replace":
+            for f in os.listdir(UPLOADS_DIR):
+                fpath = os.path.join(UPLOADS_DIR, f)
+                if os.path.isfile(fpath):
+                    try:
+                        os.remove(fpath)
+                    except OSError:
+                        pass
+            meta = []
+        else:
+            meta = load_meta()
+            meta = [m for m in meta if m["filename"] != safe_filename]
+
+        target_path = os.path.join(UPLOADS_DIR, safe_filename)
+        with open(target_path, "w", encoding="utf-8") as f:
             for line in lines:
                 f.write(line + "\n")
 
-        return jsonify({"added": len(lines), "mode": upload_mode, "stats": call_cpp("stats")})
+        meta.append({"filename": safe_filename, "docCount": len(lines)})
+        save_meta(meta)
+        updated_files = rebuild_corpus_from_uploads()
+
+        return jsonify({
+            "added": len(lines),
+            "filename": safe_filename,
+            "mode": upload_mode,
+            "files": updated_files,
+            "stats": call_cpp("stats")
+        })
     except (RuntimeError, OSError, UnicodeDecodeError) as e:
+        return error_response(e)
+
+
+@app.route("/api/documents/remove", methods=["POST"])
+def remove_document_file():
+    body = request.get_json(silent=True) or {}
+    filename = (body.get("filename") or "").strip()
+    if not filename:
+        return error_response(ValueError("Thieu ten file can xoa"), 400)
+
+    safe_filename = os.path.basename(filename)
+    fpath = os.path.join(UPLOADS_DIR, safe_filename)
+    if os.path.exists(fpath):
+        try:
+            os.remove(fpath)
+        except OSError as e:
+            return error_response(e)
+
+    meta = load_meta()
+    meta = [m for m in meta if m["filename"] != safe_filename]
+    save_meta(meta)
+    updated_files = rebuild_corpus_from_uploads()
+
+    return jsonify({
+        "removed": safe_filename,
+        "files": updated_files,
+        "stats": call_cpp("stats")
+    })
+
+
+@app.route("/api/documents/clear", methods=["POST"])
+def clear_all_documents():
+    try:
+        for f in os.listdir(UPLOADS_DIR):
+            fpath = os.path.join(UPLOADS_DIR, f)
+            if os.path.isfile(fpath):
+                try:
+                    os.remove(fpath)
+                except OSError:
+                    pass
+
+        save_meta([])
+        with open(DATA_FILE, "w", encoding="utf-8") as f:
+            pass  # Làm trống file
+
+        return jsonify({
+            "cleared": True,
+            "files": [],
+            "stats": call_cpp("stats")
+        })
+    except (RuntimeError, OSError) as e:
         return error_response(e)
 
 
