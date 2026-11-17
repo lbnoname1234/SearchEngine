@@ -25,8 +25,17 @@ const HINTS = {
   ranked: 'Kết quả xếp hạng theo điểm TF-IDF.',
   and:    'Nhiều từ khóa cho <code>AND</code>: cách nhau bởi dấu phẩy — vd <code>avl,rotation</code>',
   or:     'Nhiều từ khóa cho <code>OR</code>: cách nhau bởi dấu phẩy — vd <code>avl,hash</code>',
-  add:    'Gõ 1 câu/document rồi bấm <b style="color:var(--amber)">Add</b> để thêm vào index ngay lập tức.',
+  add:    'Chọn đoạn và vị trí câu để <b style="color:var(--amber)">thêm một câu hoàn chỉnh mới</b> thẳng vào file.',
 };
+
+// DOM references for Add Sentence Panel
+const addPanel = document.getElementById('addPanel');
+const addDocSelect = document.getElementById('addDocSelect');
+const addSentenceSelect = document.getElementById('addSentenceSelect');
+const addSentenceInput = document.getElementById('addSentenceInput');
+const addPreviewBox = document.getElementById('addPreviewBox');
+const btnCancelAdd = document.getElementById('btnCancelAdd');
+const btnSubmitAdd = document.getElementById('btnSubmitAdd');
  
 // ===== Mode toggle =====
 document.querySelectorAll('.mode-btn').forEach(btn => {
@@ -37,8 +46,19 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
     searchBtnLabel.textContent = currentMode === 'add' ? 'Add' : 'Search';
     hintText.innerHTML = HINTS[currentMode];
     searchInput.placeholder = currentMode === 'add'
-      ? 'gõ nội dung document mới...'
+      ? 'nhập câu mới (hoặc dùng bảng chọn bên dưới)...'
       : 'avl, rotation, balance...';
+
+    if (currentMode === 'add') {
+      if (addPanel) addPanel.style.display = 'block';
+      if (searchInput.value.trim() && addSentenceInput && !addSentenceInput.value.trim()) {
+        addSentenceInput.value = searchInput.value.trim();
+      }
+      loadParagraphs();
+      if (addSentenceInput) addSentenceInput.focus();
+    } else {
+      if (addPanel) addPanel.style.display = 'none';
+    }
   });
 });
  
@@ -307,41 +327,224 @@ function renderResults(docIds, items, query) {
   });
 }
 
-// ===== Add document (từ thanh tìm kiếm, mode ADD) =====
+// ===== Add sentence into specific paragraph & sentence position =====
 const uploadStatus = document.getElementById('uploadStatus');
- 
-async function addDocument() {
-  const text = searchInput.value.trim();
-  if (!text) return;
- 
-  searchBtnLabel.textContent = 'Adding…';
+let allParagraphs = [];
+
+function normalizeSentencePreview(text) {
+  let s = (text || '').trim();
+  if (s && !s.endsWith('.') && !s.endsWith('!') && !s.endsWith('?')) {
+    s += '.';
+  }
+  return s;
+}
+
+async function loadParagraphs() {
   try {
-    const res = await fetch('/api/documents/add', {
+    const res = await fetch('/api/documents/paragraphs');
+    const data = await safeJson(res);
+    if (data.error) throw new Error(data.error);
+    allParagraphs = data.paragraphs || [];
+
+    if (addDocSelect) {
+      let html = '';
+      allParagraphs.forEach(p => {
+        const snippet = p.text.length > 65 ? p.text.slice(0, 65) + '…' : p.text;
+        html += `<option value="${p.docId}">Đoạn ${p.docId + 1} (${p.filename}): "${escapeHtml(snippet)}"</option>`;
+      });
+      html += `<option value="new_paragraph">[+] Thêm thành đoạn mới ở cuối bài</option>`;
+      addDocSelect.innerHTML = html;
+      updateSentenceOptions();
+    }
+  } catch (err) {
+    console.error('Lỗi tải danh sách đoạn:', err);
+    if (addDocSelect) {
+      addDocSelect.innerHTML = `<option value="new_paragraph">[+] Thêm thành đoạn mới ở cuối bài</option>`;
+      updateSentenceOptions();
+    }
+  }
+}
+
+function updateSentenceOptions() {
+  if (!addDocSelect || !addSentenceSelect) return;
+  const docVal = addDocSelect.value;
+  if (docVal === 'new_paragraph') {
+    addSentenceSelect.innerHTML = '<option value="new">(Tạo thành đoạn mới ở cuối bài)</option>';
+    addSentenceSelect.disabled = true;
+    updatePreview();
+    return;
+  }
+
+  addSentenceSelect.disabled = false;
+  const docId = parseInt(docVal, 10);
+  const p = allParagraphs.find(x => x.docId === docId);
+  if (!p || !p.sentences || p.sentences.length === 0) {
+    addSentenceSelect.innerHTML = '<option value="end">Cuối đoạn</option>';
+    updatePreview();
+    return;
+  }
+
+  let html = '';
+  html += `<option value="before:0">Đầu đoạn (Trước câu 1)</option>`;
+  p.sentences.forEach((s, idx) => {
+    const snippet = s.length > 50 ? s.slice(0, 50) + '…' : s;
+    html += `<option value="after:${idx}" ${idx === p.sentences.length - 1 ? 'selected' : ''}>Sau câu ${idx + 1}: "${escapeHtml(snippet)}"</option>`;
+  });
+  html += `<option value="end">Cuối đoạn</option>`;
+  addSentenceSelect.innerHTML = html;
+  updatePreview();
+}
+
+function updatePreview() {
+  if (!addPreviewBox || !addDocSelect) return;
+  const rawInput = addSentenceInput ? addSentenceInput.value.trim() : '';
+  const docVal = addDocSelect.value;
+
+  if (!rawInput) {
+    addPreviewBox.innerHTML = '<span class="preview-hint">Chọn đoạn và nhập câu để xem trước vị trí chèn...</span>';
+    return;
+  }
+
+  const newSent = normalizeSentencePreview(rawInput);
+
+  if (docVal === 'new_paragraph') {
+    addPreviewBox.innerHTML = `<span>[Đoạn mới ở cuối bài]: </span><mark class="preview-inserted">${escapeHtml(newSent)}</mark>`;
+    return;
+  }
+
+  const docId = parseInt(docVal, 10);
+  const p = allParagraphs.find(x => x.docId === docId);
+  if (!p) return;
+
+  const sents = (p.sentences || []).map(s => normalizeSentencePreview(s));
+  const posVal = addSentenceSelect ? addSentenceSelect.value : 'end';
+  let insertIdx = sents.length;
+
+  if (posVal.startsWith('before:')) {
+    insertIdx = parseInt(posVal.split(':')[1], 10);
+  } else if (posVal.startsWith('after:')) {
+    insertIdx = parseInt(posVal.split(':')[1], 10) + 1;
+  } else {
+    insertIdx = sents.length;
+  }
+
+  const previewParts = [];
+  for (let i = 0; i <= sents.length; i++) {
+    if (i === insertIdx) {
+      previewParts.push(`<mark class="preview-inserted">${escapeHtml(newSent)}</mark>`);
+    }
+    if (i < sents.length) {
+      previewParts.push(`<span>${escapeHtml(sents[i])}</span>`);
+    }
+  }
+
+  addPreviewBox.innerHTML = previewParts.join(' ');
+}
+
+async function submitAddSentence() {
+  const rawText = (addSentenceInput ? addSentenceInput.value : searchInput.value).trim();
+  if (!rawText) {
+    if (addSentenceInput) addSentenceInput.focus();
+    else searchInput.focus();
+    return;
+  }
+
+  const docVal = addDocSelect ? addDocSelect.value : 'new_paragraph';
+  const posVal = addSentenceSelect ? addSentenceSelect.value : 'end';
+  let position = 'after';
+  let sentenceIndex = -1;
+  let docId = null;
+
+  if (docVal === 'new_paragraph') {
+    position = 'new_paragraph';
+    docId = -1;
+  } else {
+    docId = parseInt(docVal, 10);
+    if (posVal.startsWith('before:')) {
+      position = 'before';
+      sentenceIndex = parseInt(posVal.split(':')[1], 10);
+    } else if (posVal.startsWith('after:')) {
+      position = 'after';
+      sentenceIndex = parseInt(posVal.split(':')[1], 10);
+    } else {
+      position = 'end';
+      sentenceIndex = -1;
+    }
+  }
+
+  const submitBtn = document.getElementById('btnSubmitAdd');
+  if (submitBtn) submitBtn.disabled = true;
+  searchBtnLabel.textContent = 'Adding…';
+
+  try {
+    const res = await fetch('/api/documents/insert_sentence', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text })
+      body: JSON.stringify({
+        sentence: rawText,
+        docId: docId,
+        position: position,
+        sentenceIndex: sentenceIndex
+      })
     });
     const data = await safeJson(res);
     if (data.error) throw new Error(data.error);
- 
+
+    if (addSentenceInput) addSentenceInput.value = '';
     searchInput.value = '';
-    statRow.innerHTML = `<span style="color:var(--accent)">Đã thêm document mới ✓</span>`;
-    if (data.files) renderFileList(data.files);
-    updateIndexMeta(data.stats);
+    statRow.innerHTML = `<span style="color:var(--accent)">${data.message || 'Đã thêm câu mới ✓'}</span>`;
+    uploadStatus.textContent = data.message || 'Đã thêm câu mới ✓';
+    uploadStatus.classList.remove('error');
+
+    if (data.files) renderFileList(data.files); loadParagraphs();
+    if (data.stats) updateIndexMeta(data.stats);
     pulseTree();
     updateBenchmark();
+    await loadParagraphs();
   } catch (err) {
     statRow.innerHTML = `<span style="color: var(--danger)">Lỗi: ${err.message}</span>`;
+    uploadStatus.textContent = `Lỗi: ${err.message}`;
+    uploadStatus.classList.add('error');
   } finally {
-    searchBtnLabel.textContent = 'Add';
+    if (submitBtn) submitBtn.disabled = false;
+    searchBtnLabel.textContent = currentMode === 'add' ? 'Add' : 'Search';
   }
 }
- 
+
+if (btnCancelAdd) {
+  btnCancelAdd.addEventListener('click', () => {
+    if (addPanel) addPanel.style.display = 'none';
+    const rankBtn = document.querySelector('.mode-btn[data-mode="ranked"]');
+    if (rankBtn) rankBtn.click();
+  });
+}
+if (btnSubmitAdd) {
+  btnSubmitAdd.addEventListener('click', submitAddSentence);
+}
+if (addDocSelect) {
+  addDocSelect.addEventListener('change', updateSentenceOptions);
+}
+if (addSentenceSelect) {
+  addSentenceSelect.addEventListener('change', updatePreview);
+}
+if (addSentenceInput) {
+  addSentenceInput.addEventListener('input', () => {
+    if (searchInput && currentMode === 'add') searchInput.value = addSentenceInput.value;
+    updatePreview();
+  });
+}
+searchInput.addEventListener('input', () => {
+  if (currentMode === 'add' && addSentenceInput) {
+    addSentenceInput.value = searchInput.value;
+    updatePreview();
+  }
+});
+
 function handleSubmit() {
-  if (currentMode === 'add') addDocument();
+  if (currentMode === 'add') submitAddSentence();
   else runSearch();
 }
- 
+
 searchBtn.addEventListener('click', handleSubmit);
 searchInput.addEventListener('keydown', e => { if (e.key === 'Enter') handleSubmit(); });
  
@@ -367,7 +570,7 @@ fileInput.addEventListener('change', async () => {
     currentCorpusFile = file.name;
 
     uploadStatus.textContent = `Đã thêm ${data.added} document từ "${file.name}" ✓`;
-    if (data.files) renderFileList(data.files);
+    if (data.files) renderFileList(data.files); loadParagraphs();
     updateIndexMeta(data.stats);
     pulseTree();
     updateBenchmark();

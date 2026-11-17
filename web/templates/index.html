@@ -107,6 +107,72 @@
           </button>
         </div>
 
+        <!-- Panel Thêm câu hoàn chỉnh vào bài viết -->
+        <div class="add-panel" id="addPanel" style="display: none;">
+          <div class="add-panel-header">
+            <div class="add-panel-title">
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                <path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+              <span>Thêm câu hoàn chỉnh vào bài viết</span>
+            </div>
+            <span class="add-panel-tag">Lưu thẳng vào file</span>
+          </div>
+
+          <div class="add-panel-body">
+            <div class="add-row">
+              <div class="add-field flex-2">
+                <label for="addDocSelect">1. Chọn đoạn trong bài (Paragraph):</label>
+                <select id="addDocSelect" class="add-select">
+                  <option value="" disabled selected>Đang tải danh sách đoạn...</option>
+                </select>
+              </div>
+
+              <div class="add-field flex-2">
+                <label for="addSentenceSelect">2. Chọn vị trí câu trong đoạn:</label>
+                <select id="addSentenceSelect" class="add-select">
+                  <option value="end">Cuối đoạn</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="add-field">
+              <label for="addSentenceInput">3. Nội dung câu hoàn chỉnh cần thêm:</label>
+              <div class="add-textarea-wrap">
+                <textarea
+                  id="addSentenceInput"
+                  rows="2"
+                  placeholder="Nhập câu mới... (Hệ thống sẽ tự động thêm dấu kết câu '.' nếu chưa có)"
+                ></textarea>
+              </div>
+            </div>
+
+            <!-- Live Preview -->
+            <div class="add-preview-wrap">
+              <div class="add-preview-label">
+                <span>Xem trước đoạn văn sau khi chèn câu:</span>
+                <span class="preview-tag">Live Preview</span>
+              </div>
+              <div class="add-preview-box" id="addPreviewBox">
+                <span class="preview-hint">Chọn đoạn và nhập câu để xem trước vị trí chèn...</span>
+              </div>
+            </div>
+
+            <div class="add-footer">
+              <span class="add-note">💡 Câu được chèn sẽ có dấu kết câu (<code>.</code>, <code>!</code>, <code>?</code>) và khoảng trắng để chuyển sang câu tiếp theo.</span>
+              <div class="add-btns">
+                <button type="button" class="add-btn-cancel" id="btnCancelAdd">Đóng</button>
+                <button type="button" class="add-btn-submit" id="btnSubmitAdd">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                    <path d="M3 8.5l3.5 3.5L13 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                  <span>Chèn câu vào file</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="upload-row">
           <label class="upload-btn" for="fileInput">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
